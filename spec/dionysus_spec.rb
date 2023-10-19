@@ -4,7 +4,7 @@ require "spec_helper"
 
 RSpec.describe Dionysus do
   describe ".initialize_application!/.karafka_application" do
-    subject(:initialize_application!) { described_class.initialize_application!(initialization_options) }
+    subject(:initialize_application!) { described_class.initialize_application!(**initialization_options) }
 
     let(:dummy_logger) { double }
     let(:karafka_application) { described_class.karafka_application }
@@ -85,7 +85,7 @@ RSpec.describe Dionysus do
 
       context "when block is given" do
         subject(:initialize_application!) do
-          described_class.initialize_application!(initialization_options) do |config|
+          described_class.initialize_application!(**initialization_options) do |config|
             config.kafka[:"session.timeout.ms"] = 1230
           end
         end
