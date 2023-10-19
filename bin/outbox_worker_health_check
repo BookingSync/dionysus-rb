@@ -1,0 +1,12 @@
+#!/usr/bin/env ruby
+
+require "bundler/setup"
+require_relative "../lib/dionysus"
+
+result = Dionysus::Producer::Outbox::HealthCheck.check
+if result.empty?
+  exit 0
+else
+  Dionysus.logger.fatal "[Dionysus Outbox Worker] health check failed: #{result}"
+  exit 1
+end

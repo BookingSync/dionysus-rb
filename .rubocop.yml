@@ -1,0 +1,175 @@
+inherit_from: .rubocop_todo.yml
+
+require:
+  - rubocop-performance
+  - rubocop-rspec
+  - rubocop-rake
+
+inherit_mode:
+  merge:
+    - Exclude
+
+AllCops:
+  NewCops: enable
+  TargetRubyVersion: 2.7
+  Exclude:
+    - "db/**/*"
+    - "bin/**/*"
+    - "tmp/**/*"
+    - "log/**/*"
+    - "vendor/**/*"
+    - "spec/spec_helper.rb"
+
+Layout/ArgumentAlignment:
+  EnforcedStyle: with_fixed_indentation
+
+Layout/ArrayAlignment:
+  EnforcedStyle: with_fixed_indentation
+
+Layout/EmptyLineBetweenDefs:
+  AllowAdjacentOneLineDefs: true
+
+Layout/EndAlignment:
+  EnforcedStyleAlignWith: variable
+
+Layout/FirstArgumentIndentation:
+  EnforcedStyle: consistent
+
+Layout/FirstArrayElementIndentation:
+  EnforcedStyle: consistent
+
+Layout/FirstHashElementIndentation:
+  EnforcedStyle: consistent
+
+Layout/MultilineMethodCallIndentation:
+  EnforcedStyle: indented
+
+Layout/MultilineOperationIndentation:
+  EnforcedStyle: indented
+
+Layout/ParameterAlignment:
+  EnforcedStyle: with_fixed_indentation
+
+Layout/SpaceBeforeBrackets:
+  Enabled: false
+
+Lint/UnusedMethodArgument:
+  AllowUnusedKeywordArguments: true
+
+Metrics/ParameterLists:
+  MaxOptionalParameters: 4
+  Exclude:
+    - 'lib/dionysus.rb'
+    - 'lib/dionysus/producer/genesis/stream_job.rb'
+    - 'lib/dionysus/producer/genesis.rb'
+
+RSpec/ExpectChange:
+  EnforcedStyle: block
+
+RSpec/LetSetup:
+  Enabled: false
+
+RSpec/MultipleExpectations:
+  Max: 25
+  Exclude:
+    - 'spec/dionysus/consumer/registry_spec.rb'
+    - 'spec/dionysus/producer_spec.rb'
+    - 'spec/dionysus/producer/registry_spec.rb'
+
+Style/Alias:
+  EnforcedStyle: prefer_alias_method
+
+Style/ClassAndModuleChildren:
+  EnforcedStyle: compact
+  Exclude:
+    - 'lib/dionysus/version.rb'
+    - 'lib/dionysus/checks.rb'
+    - 'lib/dionysus.rb'
+
+Style/CommandLiteral:
+  EnforcedStyle: percent_x
+
+Style/RescueStandardError:
+  EnforcedStyle: implicit
+
+Style/StringLiterals:
+  EnforcedStyle: double_quotes
+  ConsistentQuotesInMultiline: true
+
+Style/StringLiteralsInInterpolation:
+  EnforcedStyle: double_quotes
+
+Style/RaiseArgs:
+  EnforcedStyle: compact
+
+Style/RegexpLiteral:
+  EnforcedStyle: percent_r
+
+Style/Documentation:
+  Enabled: false
+
+RSpec/NestedGroups:
+  Max: 10
+
+RSpec/MultipleMemoizedHelpers:
+  Enabled: false
+
+Lint/AmbiguousBlockAssociation:
+  Exclude:
+    - 'spec/**/*'
+    - 'lib/dionysus/support/rspec/outbox_publishable.rb'
+
+RSpec/ExampleLength:
+  Max: 50
+  Exclude:
+    - 'spec/dionysus/consumer/registry_spec.rb'
+    - 'spec/dionysus/producer_spec.rb'
+    - 'spec/dionysus/producer/registry_spec.rb'
+
+Naming/VariableNumber:
+  Enabled: false
+
+Metrics/BlockLength:
+    Max: 30
+    Exclude:
+      - 'spec/**/*'
+      - 'lib/dionysus/support/rspec/outbox_publishable.rb'
+      - 'lib/dionysus/consumer/persistor.rb'
+
+Naming/PredicateName:
+  Enabled: false
+
+Metrics/AbcSize:
+  Enabled: false
+
+Metrics/CyclomaticComplexity:
+  Max: 15
+
+Metrics/MethodLength:
+  Enabled: false
+
+Naming/AccessorMethodName:
+  Exclude:
+    - 'spec/dionysus/utils/karafka_datadog_listener_spec.rb'
+
+RSpec/DescribeClass:
+  Exclude:
+    - 'spec/integration_spec.rb'
+
+Style/MultilineBlockChain:
+  Exclude:
+    - 'spec/dionysus/producer/model_serializer_spec.rb'
+    - 'spec/dionysus/producer/serializer_spec.rb'
+
+Performance/MethodObjectAsBlock:
+  Enabled: false
+
+Metrics/ClassLength:
+  Max: 150
+
+Layout/LineLength:
+  Max: 125
+
+Naming/FileName:
+  Exclude:
+    - 'lib/dionysus-rb.rb'

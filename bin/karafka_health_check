@@ -1,0 +1,14 @@
+#!/usr/bin/env ruby
+
+require "bundler/setup"
+require "file-based-healthcheck"
+require "logger"
+require_relative "../lib/dionysus/checks"
+
+result = Dionysus::Checks::HealthCheck.check
+if result.empty?
+  exit 0
+else
+  Logger.new($stdout).fatal "[Dionysus] health check failed: #{result}"
+  exit 1
+end
