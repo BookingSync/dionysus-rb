@@ -26,7 +26,7 @@ Gem::Specification.new do |spec|
   spec.executables   = %w[karafka_health_check outbox_worker_health_check]
   spec.require_paths = ["lib"]
 
-  spec.add_development_dependency "activerecord", "7.0.0"
+  spec.add_development_dependency "activerecord", "~> 7.1"
   spec.add_development_dependency "bundler"
   spec.add_development_dependency "byebug"
   spec.add_development_dependency "crypt_keeper"
