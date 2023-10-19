@@ -40,11 +40,12 @@ RSpec.describe Dionysus do
       ENV["KARAFKA_ENV"] = nil
     end
 
+
     it "evaluates routing and creates proper consumer group" do
       initialize_application!
 
       expect(karafka_application.consumer_groups).to be_present
-      expect(karafka_application.consumer_groups.last.name).to eq "prometheus_consumer_group_for_dionysus_test"
+      expect(karafka_application.consumer_groups.last.name).to eq "dionysus_consumer_group_for_dionysus_test"
       expect(karafka_application.consumer_groups.last.topics.count).to eq 3
       expect(karafka_application.consumer_groups.last.topics[0].name).to eq "v3_rentals"
       expect(karafka_application.consumer_groups.last.topics[0].dead_letter_queue.topic).to be_nil
@@ -52,6 +53,21 @@ RSpec.describe Dionysus do
       expect(karafka_application.consumer_groups.last.topics[1].dead_letter_queue.topic).to be_nil
       expect(karafka_application.consumer_groups.last.topics[2].name).to eq "v4_bookings"
       expect(karafka_application.consumer_groups.last.topics[2].dead_letter_queue.topic).to eq "dead_messages"
+    end
+
+    context "when :consumer_group_prefix is specified" do
+      let(:extra_initialization_options) do
+        {
+          consumer_group_prefix: "prometheus_consumer_group_for"
+        }
+      end
+
+      it "creates proper consumer group" do
+        initialize_application!
+
+        expect(karafka_application.consumer_groups).to be_present
+        expect(karafka_application.consumer_groups.last.name).to eq "prometheus_consumer_group_for_dionysus_test"
+      end
     end
 
     describe "without routes evaluation" do
