@@ -3,8 +3,15 @@
 ## [0.1.0] - 2023-10-18
 
 - Turn private gem `bookingsync-prometheus` into `dionysus-rb` and release it publicly
-- Migration path from `bookingsync-prometheus`:
-TODO
+- Allow to customize `consumer_group_prefix`
+
+
+Migration path from `bookingsync-prometheus`:
+  - Rename all references of `Bookingsync::Prometheus` to `Dionysus`
+  - **CRITICAL** - when calling `Dionysus.initialize_application!` (previously `Bookingsync::Prometheus.initialize_application!`) provide a new keyword argument: `consumer_group_prefix` with a name of `prometheus_consumer_group_for` to preserve the same consumer group
+  - In the instrumentation context, all references to `prometheus`/`bookingsync_prometheus` were replaced to `dionysus`, which might require some renaming in the apps or observability tools.
+  - In the Datadog context (e.g. for `Dionysus::Producer::Outbox::DatadogLatencyReporter`), all references to `bookingsync_prometheus` were replaced to `dionysus`, which might require some renaming in the apps or observability tools, especially if you have a monitor based on this metric.
+  - In the Event Bus context, all references to `prometheus` were replaced to `dionysus`, which might require some renaming in the apps.
 
 
 ## Unreleased

@@ -13,6 +13,7 @@ PATH
       sidekiq-cron
       sigurd
       waterdrop (~> 2.0)
+      zeitwerk
 
 GEM
   remote: https://rubygems.org/

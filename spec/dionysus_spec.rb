@@ -40,7 +40,6 @@ RSpec.describe Dionysus do
       ENV["KARAFKA_ENV"] = nil
     end
 
-
     it "evaluates routing and creates proper consumer group" do
       initialize_application!
 

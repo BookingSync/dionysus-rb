@@ -56,6 +56,7 @@ Gem::Specification.new do |spec|
   spec.add_dependency "sidekiq-cron"
   spec.add_dependency "sigurd"
   spec.add_dependency "waterdrop", "~> 2.0"
+  spec.add_dependency "zeitwerk"
 
   spec.required_ruby_version = ">= 2.7"
   spec.metadata["rubygems_mfa_required"] = "true"

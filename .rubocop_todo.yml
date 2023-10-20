@@ -9,6 +9,7 @@ RSpec/AnyInstance:
 
 Layout/LineLength:
   Exclude:
+    - 'lib/dionysus.rb'
     - 'lib/dionysus/consumer/persistor.rb'
     - 'lib/dionysus/producer/genesis/streamer/standard_job.rb'
     - 'spec/dionysus/consumer/karafka_consumer_generator_spec.rb'

@@ -8,81 +8,22 @@ require "karafka"
 require "dry-monitor"
 require "concurrent/array"
 require "file-based-healthcheck"
-require "dionysus/version"
-require "dionysus/topic_name"
-require "dionysus/producer"
-require "dionysus/producer/base_responder"
-require "dionysus/producer/config"
-require "dionysus/producer/genesis"
-require "dionysus/producer/genesis/performed"
-require "dionysus/producer/genesis/streamer"
-require "dionysus/producer/genesis/streamer/base_job"
-require "dionysus/producer/genesis/streamer/standard_job"
-require "dionysus/producer/genesis/stream_job"
-require "dionysus/producer/karafka_responder_generator"
-require "dionysus/producer/key"
-require "dionysus/producer/model_serializer"
-require "dionysus/producer/deleted_record_serializer"
-require "dionysus/producer/outbox"
-require "dionysus/producer/outbox/active_record_publishable"
-require "dionysus/producer/outbox/datadog_latency_reporter"
-require "dionysus/producer/outbox/datadog_latency_reporter_job"
-require "dionysus/producer/outbox/datadog_latency_reporter_scheduler"
-require "dionysus/producer/outbox/datadog_tracer"
-require "dionysus/producer/outbox/duplicates_filter"
-require "dionysus/producer/outbox/event_name"
-require "dionysus/producer/outbox/health_check"
-require "dionysus/producer/outbox/latency_tracker"
-require "dionysus/producer/outbox/model"
-require "dionysus/producer/outbox/producer"
-require "dionysus/producer/outbox/publishable"
-require "dionysus/producer/outbox/publisher"
-require "dionysus/producer/outbox/records_processor"
-require "dionysus/producer/outbox/runner"
-require "dionysus/producer/outbox/tombstone_publisher"
-require "dionysus/producer/partition_key"
-require "dionysus/producer/registry"
-require "dionysus/producer/registry/validator"
-require "dionysus/producer/serializer"
-require "dionysus/producer/suppressor"
-require "dionysus/consumer"
-require "dionysus/consumer/config"
-require "dionysus/consumer/karafka_consumer_generator"
-require "dionysus/consumer/registry"
-require "dionysus/consumer/deserializer"
-require "dionysus/consumer/workers_group"
-require "dionysus/consumer/dionysus_event"
-require "dionysus/consumer/synced_data"
-require "dionysus/consumer/synced_data/assign_columns_from_synced_data"
-require "dionysus/consumer/synced_data/assign_columns_from_synced_data_job"
-require "dionysus/consumer/synchronizable_model"
-require "dionysus/consumer/persistor"
-require "dionysus/consumer/params_batch_processor"
-require "dionysus/consumer/params_batch_transformations"
-require "dionysus/consumer/params_batch_transformations/remove_duplicates_strategy"
-require "dionysus/consumer/batch_events_publisher"
-require "dionysus/monitor"
-require "dionysus/utils"
-require "dionysus/utils/default_message_filter"
-require "dionysus/utils/exponential_backoff"
-require "dionysus/utils/null_instrumenter"
-require "dionysus/utils/null_error_handler"
-require "dionysus/utils/null_event_bus"
-require "dionysus/utils/null_hermes_event_producer"
-require "dionysus/utils/null_model_factory"
-require "dionysus/utils/null_mutex_provider"
-require "dionysus/utils/null_retry_provider"
-require "dionysus/utils/null_transaction_provider"
-require "dionysus/utils/null_lock_client"
-require "dionysus/utils/null_tracer"
-require "dionysus/utils/sidekiq_batched_job_distributor"
-require "dionysus/checks"
-require "dionysus/railtie" if defined?(Rails)
 require "sigurd"
 require "securerandom"
+require "zeitwerk"
+
+loader = Zeitwerk::Loader.for_gem
+loader.ignore("#{__dir__}/dionysus-rb.rb")
+loader.setup
 
 module Dionysus
   CONSUMER_GROUP_PREFIX = "dionysus_consumer_group_for"
+
+  def self.loader
+    @loader ||= Zeitwerk::Loader.for_gem.tap do |loader|
+      loader.ignore("#{__dir__}/dionysus-rb.rb")
+    end
+  end
 
   def self.initialize_application!(environment:, seed_brokers:, client_id:, logger:, draw_routing: true, consumer_group_prefix: CONSUMER_GROUP_PREFIX)
     ENV["KARAFKA_ENV"] = environment
@@ -193,3 +134,5 @@ module Dionysus
   end
   private_class_method :evaluate_routing
 end
+
+Dionysus.loader.setup
