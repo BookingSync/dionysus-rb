@@ -57,7 +57,7 @@ RSpec.describe Dionysus::Producer::Genesis::Streamer do
           model,
           topic,
           number_of_days: 1,
-          batch_size: 100
+          batch_size: 1000
         )
       end
     end

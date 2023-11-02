@@ -14,10 +14,16 @@ Migration path from `bookingsync-prometheus`:
   - In the Event Bus context, all references to `prometheus` were replaced to `dionysus`, which might require some renaming in the apps.
 
 
-## Unreleased
-
-
 ## Changelog from bookingsync-prometheus gem (original private gem that was renamed to dionysus-rb) - keeping it for historical reasons as the commits are not preserved since it's a new repo
+
+## [1.17.2]
+- Get back to using `in_batches` as the combination with `lazy` does the job and looks better han `find_in_batches`
+
+## [1.17.1]
+- Address memory leak in `Bookingsync::Prometheus::Producer::Genesis::Streamer::BaseJob` caused by the fact that the way `in_batches` was used was returning all the records in the end which was not needed.
+
+## [1.17.0]
+- Change batch size for Genesis to 1000 as it's a wiser default than 100 (and it's the same as ActiveRecord's default for `in_batches`).
 
 ## [1.16.1]
 - Do not create outbox records for Genesis Replica topics as that would mean the same record would be published twice to Genesis Replica (first time with the standard topic, the second time with the Genesis one)

@@ -6,7 +6,7 @@ class Dionysus::Producer::Genesis::Streamer::BaseJob
   sidekiq_options queue: Dionysus::Producer::Config.default_sidekiq_queue
 
   ONE_DAY_IN_SECONDS = 60 * 60 * 24
-  BATCH_SIZE = 100
+  BATCH_SIZE = 1000
 
   def self.enqueue(relation, model_class, topic, number_of_days: 1, batch_size: BATCH_SIZE)
     distributor = Dionysus::Utils::SidekiqBatchedJobDistributor.new(
@@ -15,7 +15,7 @@ class Dionysus::Producer::Genesis::Streamer::BaseJob
       time_range_in_seconds: (ONE_DAY_IN_SECONDS * number_of_days)
     )
 
-    relation.in_batches(of: batch_size).each_with_index do |batch_relation, batch_number|
+    relation.in_batches(of: batch_size).lazy.each_with_index do |batch_relation, batch_number|
       distributor.enqueue_batch(
         self,
         Dionysus::Producer.configuration.sidekiq_queue,

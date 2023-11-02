@@ -17,7 +17,7 @@ class Dionysus::Producer::Genesis::Streamer
       model_class,
       topic,
       number_of_days: options.fetch(:number_of_days, 1),
-      batch_size: options.fetch(:batch_size, 100)
+      batch_size: options.fetch(:batch_size, 1000)
     )
   end
 
