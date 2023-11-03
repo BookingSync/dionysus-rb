@@ -12,10 +12,6 @@ require "sigurd"
 require "securerandom"
 require "zeitwerk"
 
-loader = Zeitwerk::Loader.for_gem
-loader.ignore("#{__dir__}/dionysus-rb.rb")
-loader.setup
-
 module Dionysus
   CONSUMER_GROUP_PREFIX = "dionysus_consumer_group_for"
 
