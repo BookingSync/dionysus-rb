@@ -17,17 +17,13 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        include:
-          - { ruby: '2.7' }
-          - { ruby: '3.0' }
-          - { ruby: '3.1' }
+        ruby: ['2.7', 3.0', '3.1']
     runs-on: ubuntu-latest
     env:
-      BUNDLE_GEMFILE: ${{ github.workspace }}/gemfiles/rails.${{ matrix.rails }}.gemfile
-      DATABASE_URL: "postgresql://postgres:postgres@127.0.0.1:5432/dionysus-rb-test"
       DD_PROFILING_NO_EXTENSION: true
       RAILS_ENV: test
       RACK_ENV: test
+      REDIS_URL: redis://localhost:6379/1
     services:
       postgres:
         image: postgres:14
@@ -59,7 +55,7 @@ jobs:
           --health-timeout 5s
           --health-retries 5
       kafka:
-        image: bitnami/kafka
+        image: wurstmeister/kafka:2.11-0.11.0.3
         ports:
           - 9092:9092
         options: >-
