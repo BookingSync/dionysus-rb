@@ -1,13 +1,62 @@
-version: 2.1
+version: 2
 jobs:
   build:
+    working_directory: ~/BookingSync/bookingsync-prometheus
+    parallelism: 1
     docker:
-      - image: ruby:3.2.2
+      - image: cimg/ruby:2.7.6
+        environment:
+          POSTGRES_URL: "postgres://docker:docker@127.0.0.1:5432"
+          DATABASE_URL: "postgres://docker:docker@127.0.0.1:5432/circle_test"
+          DATABASE_NAME: "bookingsync-prometheus"
+      - image: redis
+      - image: wurstmeister/zookeeper
+      - image: wurstmeister/kafka:2.11-0.11.0.3
+        environment:
+          KAFKA_ADVERTISED_HOST_NAME: localhost
+          KAFKA_ADVERTISED_PORT: 9092
+          KAFKA_PORT: 9092
+          KAFKA_ZOOKEEPER_CONNECT: localhost:2181
+          KAFKA_DELETE_TOPIC_ENABLE: true
+          KAFKA_CREATE_TOPICS: "v102_rentals:1:1"
+          REDIS_URL: redis://localhost:6379/1
+      - image: circleci/postgres:12.6
+        environment:
+          POSTGRES_USER: docker
+          POSTGRES_PASSWORD: docker
     steps:
       - checkout
+      - run: mkdir /tmp/circleci-test-results
+      - restore_cache:
+          keys:
+            - v1-gemfile-lock-{{ checksum "Gemfile.lock" }}
       - run:
-          name: Run the default task
-          command: |
-            gem install bundler -v 2.4.14
-            bundle install
-            bundle exec rake
+          name: Installing dependencies
+          command: bundle check --path=vendor/bundle || bundle install --path=vendor/bundle --jobs 4 --retry 3
+      - save_cache:
+          key: v1-gemfile-lock-{{ checksum "Gemfile.lock" }}
+          paths:
+            - vendor/bundle
+            - ~/.bundle
+      - run:
+          name: Installing dockerize
+          command: wget https://github.com/jwilder/dockerize/releases/download/$DOCKERIZE_VERSION/dockerize-alpine-linux-amd64-$DOCKERIZE_VERSION.tar.gz && sudo tar -C /usr/local/bin -xzvf dockerize-alpine-linux-amd64-$DOCKERIZE_VERSION.tar.gz && rm dockerize-alpine-linux-amd64-$DOCKERIZE_VERSION.tar.gz
+          environment:
+            DOCKERIZE_VERSION: v0.6.1
+      - run: sudo apt update && sudo apt install -y postgresql-client || true
+      - run:
+          name: Wait for db
+          command: dockerize -wait tcp://localhost:5432 -timeout 2m
+      - run:
+          name: Running Rubocop
+          command: bundle exec rubocop
+      - run:
+          name: Running specs
+          command: bundle exec rspec
+          environment:
+            RAILS_ENV: test
+            RACK_ENV: test
+            POSTGRES_USER: docker
+            POSTGRES_PASSWORD: docker
+      - store_test_results:
+          path: /tmp/circleci-test-results
