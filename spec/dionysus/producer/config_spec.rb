@@ -269,7 +269,7 @@ RSpec.describe Dionysus::Producer::Config do
     let(:config) { described_class.new }
 
     context "when hermes_event_producer is not specified" do
-      it { is_expected.to eq Hermes::EventProducer }
+      it { is_expected.to eq Dionysus::Utils::NullHermesEventProducer }
     end
 
     context "when hermes_event_producer is specified" do

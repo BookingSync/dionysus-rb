@@ -15,6 +15,7 @@ require "sentry-ruby"
 require "crypt_keeper"
 require "shoulda-matchers"
 require "datadog/statsd"
+require "hermes"
 
 ENV["KARAFKA_ENV"] ||= "test"
 

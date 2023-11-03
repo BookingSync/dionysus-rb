@@ -14,6 +14,7 @@ Layout/LineLength:
     - 'lib/dionysus/producer/genesis/streamer/standard_job.rb'
     - 'spec/dionysus/consumer/karafka_consumer_generator_spec.rb'
     - 'spec/dionysus/producer/outbox/publisher_spec.rb'
+    - 'spec/dionysus/producer/genesis_spec.rb'
 
 Lint/NonLocalExitFromIterator:
   Exclude:

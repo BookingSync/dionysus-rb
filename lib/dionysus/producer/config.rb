@@ -75,7 +75,7 @@ class Dionysus::Producer::Config
   end
 
   def hermes_event_producer
-    @hermes_event_producer || Hermes::EventProducer
+    @hermes_event_producer || Dionysus::Utils::NullHermesEventProducer
   end
 
   def publish_after_commit

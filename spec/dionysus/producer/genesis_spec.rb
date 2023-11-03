@@ -58,6 +58,7 @@ RSpec.describe Dionysus::Producer::Genesis do
         configuration.adapter = :in_memory
         configuration.application_prefix = "genesis_spec"
       end
+      Hermes::Publisher.instance.current_adapter.store.clear
 
       example.run
 
@@ -88,10 +89,28 @@ RSpec.describe Dionysus::Producer::Genesis do
           .with(queue: :dionysus)
       end
 
-      it "publishes a genesis performed event" do
-        expect do
-          stream
-        end.to publish_async_message(routing_key).with_event_payload(event_payload)
+      context "when Hermes Event producer is provided in the config" do
+        before do
+          allow(Dionysus::Producer.configuration).to receive(:hermes_event_producer).and_return(Hermes::EventProducer)
+        end
+
+        it "publishes a genesis performed event" do
+          expect do
+            stream
+          end.to publish_async_message(routing_key).with_event_payload(event_payload)
+        end
+      end
+
+      context "when Hermes Event producer is not provided in the config" do
+        before do
+          allow(Dionysus::Producer.configuration).to receive(:hermes_event_producer).and_return(Dionysus::Utils::NullHermesEventProducer)
+        end
+
+        it "does not publish a genesis performed event" do
+          expect do
+            stream
+          end.not_to publish_async_message(routing_key).with_event_payload(event_payload)
+        end
       end
     end
 

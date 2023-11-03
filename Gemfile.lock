@@ -7,7 +7,6 @@ PATH
       concurrent-ruby
       dry-monitor
       file-based-healthcheck
-      hermes-rb
       karafka (~> 2.0)
       sidekiq
       sidekiq-cron
@@ -233,6 +232,7 @@ DEPENDENCIES
   ddtrace
   dionysus-rb!
   dogstatsd-ruby
+  hermes-rb
   pg
   rake (~> 13.0)
   redis

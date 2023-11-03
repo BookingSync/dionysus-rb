@@ -9,6 +9,8 @@
 Migration path from `bookingsync-prometheus`:
   - Rename all references of `Bookingsync::Prometheus` to `Dionysus`
   - **CRITICAL** - when calling `Dionysus.initialize_application!` (previously `Bookingsync::Prometheus.initialize_application!`) provide a new keyword argument: `consumer_group_prefix` with a name of `prometheus_consumer_group_for` to preserve the same consumer group
+  - For producers, `config.hermes_event_producer` no longer defaults to `Hermes::EventProducer`, if you want to preserve the behavior make sure to configure this attribute explicitly: `config.hermes_event_producer = Hermes::EventProducer`
+  - `Bookingsync::Prometheus::Producer::Genesis::Performed` event was renamed to `Dionysus::Producer::Genesis::Performed`
   - In the instrumentation context, all references to `prometheus`/`bookingsync_prometheus` were replaced to `dionysus`, which might require some renaming in the apps or observability tools.
   - In the Datadog context (e.g. for `Dionysus::Producer::Outbox::DatadogLatencyReporter`), all references to `bookingsync_prometheus` were replaced to `dionysus`, which might require some renaming in the apps or observability tools, especially if you have a monitor based on this metric.
   - In the Event Bus context, all references to `prometheus` were replaced to `dionysus`, which might require some renaming in the apps.

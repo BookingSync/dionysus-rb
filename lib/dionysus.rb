@@ -1,7 +1,6 @@
 # frozen_string_literal: true
 
 require "logger"
-require "hermes"
 require "sidekiq"
 require "sidekiq-cron"
 require "karafka"
