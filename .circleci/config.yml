@@ -1,14 +1,14 @@
 version: 2
 jobs:
   build:
-    working_directory: ~/BookingSync/bookingsync-prometheus
+    working_directory: ~/BookingSync/dionysus-rb
     parallelism: 1
     docker:
       - image: cimg/ruby:2.7.6
         environment:
           POSTGRES_URL: "postgres://docker:docker@127.0.0.1:5432"
           DATABASE_URL: "postgres://docker:docker@127.0.0.1:5432/circle_test"
-          DATABASE_NAME: "bookingsync-prometheus"
+          DATABASE_NAME: "dionysus-rb"
       - image: redis
       - image: wurstmeister/zookeeper
       - image: wurstmeister/kafka:2.11-0.11.0.3

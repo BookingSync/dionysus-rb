@@ -8,8 +8,8 @@ Gem::Specification.new do |spec|
   spec.authors = ["Karol Galanciak"]
   spec.email = ["karol.galanciak@gmail.com", "karol@bookingsync.com", "dev@bookingsync.com"]
 
-  spec.summary = "A framework on top of Karafka for data transfer/Change Data Capture between apps."
-  spec.description = "A framework on top of Karafka for data transfer/Change Data Capture between apps."
+  spec.summary = "A framework on top of Karafka for Change Data Capture on the model level."
+  spec.description = "A framework on top of Karafka for Change Data Capture on the model level."
   spec.homepage = "https://github.com/BookingSync/dionysus-rb"
   spec.license = "MIT"
 
