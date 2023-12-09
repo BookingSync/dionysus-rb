@@ -16,7 +16,6 @@ jobs:
           KAFKA_ADVERTISED_HOST_NAME: localhost
           KAFKA_ADVERTISED_PORT: 9092
           KAFKA_PORT: 9092
-          KAFKA_ZOOKEEPER_CONNECT: localhost:2181
           KAFKA_DELETE_TOPIC_ENABLE: true
           KAFKA_CREATE_TOPICS: "v102_rentals:1:1"
           REDIS_URL: redis://localhost:6379/1
