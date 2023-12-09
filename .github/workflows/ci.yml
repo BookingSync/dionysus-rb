@@ -53,32 +53,15 @@ jobs:
           --health-timeout 5s
           --health-retries 5
       zookeeper:
-        image: bitnami/zookeeper
+        image: wurstmeister/zookeeper
         ports:
           - 2181:2181
-        env:
-          ALLOW_ANONYMOUS_LOGIN: yes
-        options: >-
-          --health-cmd "echo mntr | nc -w 2 -q 2 localhost 2181"
-          --health-interval 10s
-          --health-timeout 5s
-          --health-retries 5
       kafka:
-        image: bitnami/kafka
+        image: wurstmeister/kafka:2.11-0.11.0.3
         ports:
           - 9092:9092
-        options: >-
-          --health-cmd "kafka-broker-api-versions.sh --version"
-          --health-interval 10s
-          --health-timeout 5s
-          --health-retries 5
         env:
-          ALLOW_PLAINTEXT_LISTENER: yes
-          KAFKA_CFG_KAFKA_ZOOKEEPER_CONNECT: "zookeeper:2181"
-          KAFKA_ZOOKEEPER_CONNECT: "zookeeper:2181"
-          KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://broker:9092
-          KAFKA_CFG_KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://broker:9092
-          KAFKA_ADVERTISED_HOST_NAME: broker
+          KAFKA_ADVERTISED_HOST_NAME: localhost
           KAFKA_ADVERTISED_PORT: 9092
           KAFKA_PORT: 9092
           KAFKA_DELETE_TOPIC_ENABLE: true
