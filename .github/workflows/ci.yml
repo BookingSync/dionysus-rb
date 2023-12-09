@@ -26,9 +26,9 @@ jobs:
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: postgres
       POSTGRES_DB: dionysus-rb-test
-      KAFKA_ADVERTISED_HOST_NAME: broker
+      KAFKA_ADVERTISED_HOST_NAME: kafka
       KAFKA_ZOOKEEPER_CONNECT: "zookeeper:2181"
-      KAFKA_ADVERTISED_LISTENERS: "PLAINTEXT://broker:9092"
+      KAFKA_ADVERTISED_LISTENERS: "PLAINTEXT://kafka:9092"
       KAFKA_ADVERTISED_PORT: 9092
       KAFKA_PORT: 9092
       KAFKA_DELETE_TOPIC_ENABLE: true
@@ -61,13 +61,17 @@ jobs:
         ports:
           - 9092:9092
         env:
-          KAFKA_ADVERTISED_HOST_NAME: broker
+          KAFKA_ADVERTISED_HOST_NAME: kafka
           KAFKA_ZOOKEEPER_CONNECT: "zookeeper:2181"
-          KAFKA_ADVERTISED_LISTENERS: "PLAINTEXT://broker:9092"
+          KAFKA_ADVERTISED_LISTENERS: "PLAINTEXT://kafka:9092"
           KAFKA_ADVERTISED_PORT: 9092
           KAFKA_PORT: 9092
           KAFKA_DELETE_TOPIC_ENABLE: true
           KAFKA_CREATE_TOPICS: "v102_rentals:1:1"
+        volumes:
+          - /var/run/docker.sock:/var/run/docker.sock
+        depends_on:
+          - zookeeper
     steps:
     - uses: actions/checkout@v2
     - uses: ruby/setup-ruby@v1
