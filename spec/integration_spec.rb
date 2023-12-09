@@ -78,6 +78,11 @@ RSpec.describe "Integration scenario" do
       config.shutdown_timeout = 30_000
       config.initial_offset = "latest"
     end
+    begin
+      Karafka::Admin.create_topic("v102_rentals", 1, 1)
+    rescue  StandardError => e
+      puts e
+    end
   end
 
   around do |example|
