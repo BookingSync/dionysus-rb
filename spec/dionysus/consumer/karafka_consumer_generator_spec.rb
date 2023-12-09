@@ -3632,6 +3632,7 @@ RSpec.describe Dionysus::Consumer::KarafkaConsumerGenerator do
           end
 
           before do
+            DBForKarafkaConsumerTest.reset!
             DBForKarafkaConsumerTest.rentals << rental_1
             config.event_bus = event_bus
           end

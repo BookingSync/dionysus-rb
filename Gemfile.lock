@@ -166,6 +166,8 @@ GEM
     rspec-mocks (3.10.2)
       diff-lcs (>= 1.2.0, < 2.0)
       rspec-support (~> 3.10.0)
+    rspec-retry (0.6.2)
+      rspec-core (> 3.3)
     rspec-sidekiq (3.1.0)
       rspec-core (~> 3.0, >= 3.0.0)
       sidekiq (>= 2.4.0)
@@ -239,6 +241,7 @@ DEPENDENCIES
   redis-namespace
   redlock
   rspec (~> 3.0)
+  rspec-retry
   rspec-sidekiq
   rubocop
   rubocop-performance

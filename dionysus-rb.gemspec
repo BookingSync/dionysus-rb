@@ -37,6 +37,7 @@ Gem::Specification.new do |spec|
   spec.add_development_dependency "redis"
   spec.add_development_dependency "redis-namespace"
   spec.add_development_dependency "redlock"
+  spec.add_development_dependency "rspec-retry"
   spec.add_development_dependency "rspec-sidekiq"
   spec.add_development_dependency "rubocop"
   spec.add_development_dependency "rubocop-performance"
