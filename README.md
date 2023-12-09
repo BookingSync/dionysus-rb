@@ -22,11 +22,10 @@ If bundler is not being used to manage dependencies, install the gem by executin
 
 
 
-TODO
 Please read [this article first](put https://www.smily.com/engineering/integration-patterns-for-distributed-architecture-how-we-use-kafka-in-smily-and-why) to understand the context how this gem was built. Also, it's just recently been made public, so some part of the docs might require clarification. If you find any section like that, don't hesitate to submit an issue.
 
-TODO
-Also, [read this article](the link goes here), which is an introduction to the gem.
+### TODO - update the article is published.
+Also, [read this article], which is an introduction to the gem.
 
 
 Any application can be both consumer and the producer of Karafka events, so let's take a look how to handle configuration for both scenario.
@@ -42,7 +41,7 @@ First, you need to define a file `karafka.rb` with a content like this:
 Dionysus.initialize_application!(
   environment: ENV["RAILS_ENV"],
   seed_brokers: ENV.fetch("DIONYSUS_SEED_BROKER").split(";"),
-  client_id: `NAME_OF_THE_APP`,
+  client_id: "NAME_OF_THE_APP",
   logger: Rails.logger
 )
 ```
@@ -57,7 +56,7 @@ If you are migration from the gem prior to making `dionysus-rb` public, most lik
 Dionysus.initialize_application!(
   environment: ENV["RAILS_ENV"],
   seed_brokers: ENV.fetch("DIONYSUS_SEED_BROKER").split(";"),
-  client_id: `NAME_OF_THE_APP`,
+  client_id: "NAME_OF_THE_APP",
   logger: Rails.logger,
   consumer_group_prefix: "prometheus_consumer_group_for"
 )
@@ -672,7 +671,7 @@ If you are migration from the gem prior to making `dionysus-rb` public, most lik
 Dionysus.initialize_application!(
   environment: ENV["RAILS_ENV"],
   seed_brokers: ENV.fetch("DIONYSUS_SEED_BROKER").split(";"),
-  client_id: `NAME_OF_THE_APP`,
+  client_id: ["NAME_OF_THE_APP"][],
   logger: Rails.logger,
   consumer_group_prefix: "prometheus_consumer_group_for"
 )
@@ -690,7 +689,6 @@ Rails.application.config.to_prepare do
       topic :rentals do
         dead_letter_queue(topic: "dead_messages", max_retries: 2)
       end
-
     end
 
     Dionysus::Consumer.configure do |config|
@@ -698,6 +696,13 @@ Rails.application.config.to_prepare do
       config.model_factory = DionysusModelFactory # required
     end
   end
+
+  Dionysus.initialize_application!(
+    environment: ENV["RAILS_ENV"],
+    seed_brokers: [ENV.fetch("DIONYSUS_SEED_BROKER")],
+    client_id: NAME_OF_THE_APP,
+    logger: Rails.logger
+  )
 end
 ```
 
@@ -1198,3 +1203,4 @@ Bug reports and pull requests are welcome on GitHub at https://github.com/Bookin
 ## License
 
 The gem is available as open source under the terms of the [MIT License](https://opensource.org/licenses/MIT).
+["NAME_OF_THE_APP"]:
