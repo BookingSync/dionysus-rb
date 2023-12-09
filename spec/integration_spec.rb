@@ -80,7 +80,7 @@ RSpec.describe "Integration scenario" do
     end
     begin
       Karafka::Admin.create_topic("v102_rentals", 1, 1)
-    rescue  StandardError => e
+    rescue => e
       puts e
     end
   end
