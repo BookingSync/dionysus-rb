@@ -62,9 +62,11 @@ RSpec.describe "Integration scenario" do
       config.outbox_model = outbox_model
     end
 
+
+
     Dionysus.initialize_application!(
       environment: "development",
-      seed_brokers: ["localhost:9092"],
+      seed_brokers: ["broker:9092"],
       client_id: client_id,
       logger: Logger.new($stdout)
     ) do |config|
