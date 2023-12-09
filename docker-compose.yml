@@ -26,6 +26,7 @@ services:
       KAFKA_ALLOW_EVERYONE_IF_NO_ACL_FOUND: "true"
       KAFKA_AUTHORIZER_CLASS_NAME: org.apache.kafka.metadata.authorizer.StandardAuthorizer
       KAFKA_CREATE_TOPICS: "v102_rentals:1:1"
+      KAFKA_TOPIC_CREATE_BACKOFF_MS="10000"
       command: "bash -c 'docker exec kafka sh -c \"sleep 5 && kafka-topics --bootstrap-server broker:9092 --create --topic v102_rentals --replication-factor 1 --partitions 1\"'"
   kafka-setup:
     image: confluentinc/cp-kafka:7.5.2
