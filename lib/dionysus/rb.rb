@@ -2,9 +2,7 @@
 
 require_relative "rb/version"
 
-module Dionysus
-  module Rb
-    class Error < StandardError; end
-    # Your code goes here...
-  end
+# Your code goes here...
+class Dionysus::Rb::Error < StandardError
+  # Your code goes here...
 end

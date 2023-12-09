@@ -1,0 +1,53 @@
+RSpec/VerifiedDoubles:
+  Enabled: false
+
+RSpec/AnyInstance:
+  Exclude:
+    - 'spec/dionysus/consumer/karafka_consumer_generator_spec.rb'
+    - 'spec/dionysus/producer/outbox/datadog_latency_reporter_job_spec.rb'
+    - 'spec/dionysus/producer/outbox/active_record_publishable_spec.rb'
+
+Layout/LineLength:
+  Exclude:
+    - 'lib/dionysus.rb'
+    - 'lib/dionysus/consumer/persistor.rb'
+    - 'lib/dionysus/producer/genesis/streamer/standard_job.rb'
+    - 'spec/dionysus/consumer/karafka_consumer_generator_spec.rb'
+    - 'spec/dionysus/producer/outbox/publisher_spec.rb'
+    - 'spec/dionysus/producer/genesis_spec.rb'
+
+Lint/NonLocalExitFromIterator:
+  Exclude:
+    - 'lib/dionysus/producer/karafka_responder_generator.rb'
+    - 'lib/dionysus/consumer/persistor.rb'
+
+Metrics/PerceivedComplexity:
+  Exclude:
+    - 'lib/dionysus/producer/karafka_responder_generator.rb'
+    - 'lib/dionysus/consumer/karafka_consumer_generator.rb'
+    - 'lib/dionysus/consumer/persistor.rb'
+
+RSpec/LeakyConstantDeclaration:
+  Exclude:
+    - 'spec/dionysus/producer_spec.rb'
+
+Lint/ConstantDefinitionInBlock:
+  Exclude:
+    - 'spec/dionysus/producer_spec.rb'
+
+Lint/EmptyClass:
+  Exclude:
+    - 'lib/dionysus/consumer/synced_data.rb'
+    - 'lib/dionysus/consumer/params_batch_transformations.rb'
+
+RSpec/ScatteredSetup:
+  Exclude:
+    - 'spec/dionysus/producer/outbox/records_processor_spec.rb'
+
+Metrics/CyclomaticComplexity:
+  Exclude:
+    - 'lib/dionysus/producer/karafka_responder_generator.rb'
+
+Metrics/BlockLength:
+  Exclude:
+    - 'lib/dionysus/producer/karafka_responder_generator.rb'
