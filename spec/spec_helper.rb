@@ -102,8 +102,8 @@ RSpec.configure do |config|
   RSpec::Matchers.define_negated_matcher :avoid_changing, :change
 
   database_name = ENV.fetch("DATABASE_NAME", "dionysus-test")
-  database_url = ENV.fetch("DATABASE_URL", "postgres://:@localhost/#{database_name}")
-  postgres_url = ENV.fetch("POSTGRES_URL", "postgres://:@localhost")
+  database_url = ENV.fetch("DATABASE_URL", "postgres://localhost/#{database_name}")
+  postgres_url = ENV.fetch("POSTGRES_URL", "postgres://localhost")
   ActiveRecord::Base.establish_connection(database_url)
   begin
     database = ActiveRecord::Base.connection
