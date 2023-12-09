@@ -66,7 +66,7 @@ RSpec.describe "Integration scenario" do
 
     Dionysus.initialize_application!(
       environment: "development",
-      seed_brokers: ["kafka:9092"],
+      seed_brokers: ["localhost:9092"],
       client_id: client_id,
       logger: Logger.new($stdout)
     ) do |config|
