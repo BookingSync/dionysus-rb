@@ -42,6 +42,7 @@ jobs:
       KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
       KAFKA_ALLOW_EVERYONE_IF_NO_ACL_FOUND: "true"
       KAFKA_AUTHORIZER_CLASS_NAME: org.apache.kafka.metadata.authorizer.StandardAuthorizer
+      KAFKA_CREATE_TOPICS: "v102_rentals:1:1"
     services:
       postgres:
         image: postgres:14
