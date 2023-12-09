@@ -13,17 +13,37 @@ jobs:
           bundler-cache: true
       - run: bundle exec rubocop
   rspec:
-  rspec:
+    timeout-minutes: 10
     strategy:
       fail-fast: false
       matrix:
-        ruby: ['2.7', 3.0', '3.1']
+        ruby: ['2.7', '3.0.6', '3.1']
     runs-on: ubuntu-latest
     env:
       DD_PROFILING_NO_EXTENSION: true
       RAILS_ENV: test
       RACK_ENV: test
       REDIS_URL: redis://localhost:6379/1
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: dionysus-rb-test
+      CLUSTER_ID: kafka-docker-cluster-1
+      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_PROCESS_ROLES: broker,controller
+      KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
+      KAFKA_LISTENERS: PLAINTEXT://:9092,CONTROLLER://:9093
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: CONTROLLER:PLAINTEXT,PLAINTEXT:PLAINTEXT
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://127.0.0.1:9092
+      KAFKA_BROKER_ID: 1
+      KAFKA_CONTROLLER_QUORUM_VOTERS: 1@127.0.0.1:9093
+      ALLOW_PLAINTEXT_LISTENER: 'yes'
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: 'true'
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
+      KAFKA_ALLOW_EVERYONE_IF_NO_ACL_FOUND: "true"
+      KAFKA_AUTHORIZER_CLASS_NAME: org.apache.kafka.metadata.authorizer.StandardAuthorizer
+      KAFKA_CREATE_TOPICS: "v102_rentals:1:1"
     services:
       postgres:
         image: postgres:14
@@ -43,36 +63,14 @@ jobs:
           --health-interval 10s
           --health-timeout 5s
           --health-retries 5
-      zookeeper:
-        image: bitnami/zookeeper
-        ports:
-          - 2181:2181
-        env:
-          ALLOW_ANONYMOUS_LOGIN: yes
-        options: >-
-          --health-cmd "echo mntr | nc -w 2 -q 2 localhost 2181"
-          --health-interval 10s
-          --health-timeout 5s
-          --health-retries 5
-      kafka:
-        image: wurstmeister/kafka:2.11-0.11.0.3
-        ports:
-          - 9092:9092
-        options: >-
-          --health-cmd "kafka-broker-api-versions.sh --version"
-          --health-interval 10s
-          --health-timeout 5s
-          --health-retries 5
-        env:
-          KAFKA_ADVERTISED_HOST_NAME: localhost
-          KAFKA_ADVERTISED_PORT: 9092
-          KAFKA_PORT: 9092
-          KAFKA_ZOOKEEPER_CONNECT: localhost:2181
-          KAFKA_DELETE_TOPIC_ENABLE: true
-          KAFKA_CREATE_TOPICS: "v102_rentals:1:1"
     steps:
     - uses: actions/checkout@v2
+    - name: Start Kafka with docker-compose
+      run: |
+        docker-compose up -d || (sleep 5 && docker-compose up -d)
+
     - uses: ruby/setup-ruby@v1
+
       with:
         ruby-version: ${{ matrix.ruby }}
         bundler-cache: true

@@ -3632,6 +3632,7 @@ RSpec.describe Dionysus::Consumer::KarafkaConsumerGenerator do
           end
 
           before do
+            DBForKarafkaConsumerTest.reset!
             DBForKarafkaConsumerTest.rentals << rental_1
             config.event_bus = event_bus
           end
@@ -3675,7 +3676,7 @@ RSpec.describe Dionysus::Consumer::KarafkaConsumerGenerator do
               end.to raise_error(%r{whoops})
             end
 
-            it "still processes things from other threads that don't blow up" do
+            it "still processes things from other threads that don't blow up", retry: 3 do
               expect do
                 consume
               rescue

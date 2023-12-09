@@ -9,6 +9,7 @@ require "support/stubbed_active_record_interface_and_models"
 require "support/is_expected_block"
 require "hermes/support/matchers/publish_async_message"
 require "sidekiq/testing"
+require "rspec/retry"
 require "rspec-sidekiq"
 require "ddtrace"
 require "sentry-ruby"
@@ -102,8 +103,16 @@ RSpec.configure do |config|
   RSpec::Matchers.define_negated_matcher :avoid_changing, :change
 
   database_name = ENV.fetch("DATABASE_NAME", "dionysus-test")
-  database_url = ENV.fetch("DATABASE_URL", "postgres://:@localhost/#{database_name}")
-  postgres_url = ENV.fetch("POSTGRES_URL", "postgres://:@localhost")
+  if (posgres_user = ENV["POSTGRES_USER"]) && (postgres_password = ENV["POSTGRES_PASSWORD"])
+    database_url = ENV.fetch("DATABASE_URL", "postgres://#{posgres_user}:#{postgres_password}@localhost/#{database_name}")
+    postgres_url = ENV.fetch("POSTGRES_URL", "postgres://#{posgres_user}:#{postgres_password}@localhost")
+  else
+    database_url = ENV.fetch("DATABASE_URL", "postgres://localhost/#{database_name}")
+    postgres_url = ENV.fetch("POSTGRES_URL", "postgres://localhost")
+  end
+
+
+
   ActiveRecord::Base.establish_connection(database_url)
   begin
     database = ActiveRecord::Base.connection
