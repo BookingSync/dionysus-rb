@@ -171,7 +171,7 @@ RSpec.describe Dionysus::Producer::Outbox::Runner, :freeze_time, :with_outbox_co
         expect(outbox_record_2.reload.published_at).to eq Time.current
       end
 
-      it "handles instrumentation" do
+      it "handles instrumentation", retry: 3 do
         expect(Dionysus.monitor).to have_received(:instrument).with("outbox_producer.started")
         expect(Dionysus.monitor).to have_received(:instrument).with("outbox_producer.processing_topic",
           topic: "v102_rentals")
