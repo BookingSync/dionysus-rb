@@ -175,11 +175,11 @@ RSpec.describe Dionysus::Producer::Outbox::Runner, :freeze_time, :with_outbox_co
         if RUBY_VERSION.start_with?("2.7")
           expect(Dionysus.monitor).to have_received(:instrument).with("outbox_producer.started", {})
           expect(Dionysus.monitor).to have_received(:instrument).with("outbox_producer.heartbeat", {})
-          .at_least(:once)
+            .at_least(:once)
         else
           expect(Dionysus.monitor).to have_received(:instrument).with("outbox_producer.started")
           expect(Dionysus.monitor).to have_received(:instrument).with("outbox_producer.heartbeat")
-          .at_least(:once)
+            .at_least(:once)
         end
 
         expect(Dionysus.monitor).to have_received(:instrument).with("outbox_producer.processing_topic",
