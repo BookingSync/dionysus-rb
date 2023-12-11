@@ -9,8 +9,7 @@ class Dionysus::Producer::Outbox::DatadogTracer
   end
 
   def trace(event_name, topic)
-    tracer.trace(event_name, span_type: "worker", service: self.class.service_name,
-      on_error: error_handler) do |span|
+    tracer.trace(event_name, span_type: "worker", service: self.class.service_name, on_error: error_handler) do |span|
       span.set_tag("topic", topic)
 
       yield
