@@ -1,6 +1,6 @@
 ## [Unreleased]
 
-## [0.1.0] - 2023-12-18
+## [0.1.0]
 
 - Turn private gem `bookingsync-prometheus` into `dionysus-rb` and release it publicly
 - Allow to customize `consumer_group_prefix`

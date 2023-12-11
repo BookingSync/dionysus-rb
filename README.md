@@ -1,5 +1,7 @@
 # Dionysus::Rb
 
+![Dionysus](assets/logo.svg)
+
 `Dionysus` - a framework on top of [Karafka](http://github.com/karafka/karafka) for Change Data Capture on the domain model level.
 
 In distibuted systems, transferring data between applications is often a challenge. There are multiple ways how of to do this, especially when using Kafka. There is a good chance that you be familiar with [Change Data Capture](https://www.confluent.io/learn/change-data-capture/) pattern, often applied to relational databases such as PostgreSQL, which is a way of extracting row-level changes in real time. In that cases CDC focuses on INSERTs, UPDATEs and DELETEs of rows. If you are familiar with logical replication, this concept ring a bell. When exploring Kafka, you might have you  heard of [Debezium](https://debezium.io), which makes CDC via Kafka simple.
