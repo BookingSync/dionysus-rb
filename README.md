@@ -20,9 +20,7 @@ If bundler is not being used to manage dependencies, install the gem by executin
 
 ## Usage
 
-
-
-Please read [this article first](put https://www.smily.com/engineering/integration-patterns-for-distributed-architecture-how-we-use-kafka-in-smily-and-why) to understand the context how this gem was built. Also, it's just recently been made public, so some part of the docs might require clarification. If you find any section like that, don't hesitate to submit an issue.
+Please read [this article first](https://www.smily.com/engineering/integration-patterns-for-distributed-architecture-how-we-use-kafka-in-smily-and-why) to understand the context how this gem was built. Also, it's just recently been made public, so some part of the docs might require clarification. If you find any section like that, don't hesitate to submit an issue.
 
 ### TODO - update the article is published.
 Also, [read this article], which is an introduction to the gem.
