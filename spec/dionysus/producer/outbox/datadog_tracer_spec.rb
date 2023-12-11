@@ -24,14 +24,15 @@ RSpec.describe Dionysus::Producer::Outbox::DatadogTracer do
     let(:dd_tracer) do
       if Datadog.respond_to?(:tracer)
         Datadog.tracer
-
       else
         Datadog::Tracing
       end
     end
 
     before do
-      allow(dd_tracer).to receive(:trace).and_call_original
+      allow(dd_tracer).to receive(:trace)
+        .with(event_name, hash_including(service: "dionysus_outbox_worker", span_type: "worker", on_error: anything))
+        .and_call_original
     end
 
     it "uses Datadog tracer" do

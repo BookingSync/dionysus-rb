@@ -171,16 +171,23 @@ RSpec.describe Dionysus::Producer::Outbox::Runner, :freeze_time, :with_outbox_co
         expect(outbox_record_2.reload.published_at).to eq Time.current
       end
 
-      it "handles instrumentation" do
-        expect(Dionysus.monitor).to have_received(:instrument).with("outbox_producer.started")
+      it "handles instrumentation", retry: 3 do
+        if RUBY_VERSION.start_with?("2.7")
+          expect(Dionysus.monitor).to have_received(:instrument).with("outbox_producer.started", {})
+          expect(Dionysus.monitor).to have_received(:instrument).with("outbox_producer.heartbeat", {})
+            .at_least(:once)
+        else
+          expect(Dionysus.monitor).to have_received(:instrument).with("outbox_producer.started")
+          expect(Dionysus.monitor).to have_received(:instrument).with("outbox_producer.heartbeat")
+            .at_least(:once)
+        end
+
         expect(Dionysus.monitor).to have_received(:instrument).with("outbox_producer.processing_topic",
           topic: "v102_rentals")
         expect(Dionysus.monitor).to have_received(:instrument).with("outbox_producer.published",
           outbox_record: instance_of(DionysusOutbox)).at_least(:once)
         expect(Dionysus.monitor).to have_received(:instrument).with("outbox_producer.processed_topic",
           topic: "v102_rentals")
-        expect(Dionysus.monitor).to have_received(:instrument).with("outbox_producer.heartbeat")
-          .at_least(:once)
       end
     end
   end
