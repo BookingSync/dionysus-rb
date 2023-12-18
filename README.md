@@ -24,8 +24,8 @@ If bundler is not being used to manage dependencies, install the gem by executin
 
 Please read [this article first](https://www.smily.com/engineering/integration-patterns-for-distributed-architecture-how-we-use-kafka-in-smily-and-why) to understand the context how this gem was built. Also, it's just recently been made public, so some part of the docs might require clarification. If you find any section like that, don't hesitate to submit an issue.
 
-### TODO - update the article is published.
-Also, [read this article], which is an introduction to the gem.
+
+Also, [read this article](https://www.smily.com/engineering/integration-patterns-for-distributed-architecture-intro-to-dionysus-rb), which is an introduction to the gem.
 
 
 Any application can be both consumer and the producer of Karafka events, so let's take a look how to handle configuration for both scenario.
