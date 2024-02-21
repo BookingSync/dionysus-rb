@@ -1,4 +1,5 @@
 ## [Unreleased]
+- Fix creation of outbox records when updating a record that was soft-deleted
 
 ## [0.1.0]
 
