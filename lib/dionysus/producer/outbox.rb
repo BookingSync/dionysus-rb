@@ -82,10 +82,10 @@ class Dionysus::Producer::Outbox
   def event_type_for_update_of_soft_deletable_record_for_soft_delete_state_change(publishable)
     if publishable.previous_changes_uncanceled?
       :created
-    elsif publishable.previous_changes_canceled?
+    elsif publishable.previous_changes_canceled? || publishable.previous_changes_still_canceled?
       :destroyed
-    elsif publishable.previous_changes_still_canceled? || publishable.previous_changed_still_visible?
-      nil
+    elsif publishable.previous_changed_still_visible?
+      raise "that should never happen: a cannot be still visible when it was soft-deleted"
     else
       raise "that should never happen"
     end
@@ -95,7 +95,7 @@ class Dionysus::Producer::Outbox
     if publishable.visible? || (publishable.soft_deleted? && publishable.dionysus_publish_updates_after_soft_delete?)
       :updated
     elsif publishable.soft_deleted?
-      nil
+      nil # deliberately not returning any event because the record is configured as such
     else
       raise "that should never happen"
     end

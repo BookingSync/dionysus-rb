@@ -458,12 +458,35 @@ RSpec.describe Dionysus::Producer::Outbox::ActiveRecordPublishable do
           end
         end
 
-        context "when the record is soft-deleted already" do
+        context "when the record is soft-deleted already", freeze_time: "2022-08-22T08:01:47Z" do
+          let(:created_outbox_record) { DionysusOutbox.find_by(topic: "v102_rentals") }
+          let(:observer_outbox_record) { DionysusOutbox.find_by(topic: "__outbox_observer__") }
+
           before do
-            resource.update!(soft_delete_column => 1.day.ago)
+            resource.update!(soft_delete_column => 1.day.ago, updated_at: 1.day.ago)
+            DionysusOutbox.delete_all
           end
 
-          it { is_expected_block.not_to change { DionysusOutbox.count } }
+          it "creates PrometheusOutbox records with event_name with 'deleted' event" do
+            expect do
+              update_record
+            end.to change { DionysusOutbox.count }.from(0).to(2)
+            expect(created_outbox_record.event_name).to eq "example_publishable_cancelable_resource_destroyed"
+            expect(created_outbox_record.resource_class).to eq "ExamplePublishableCancelableResource"
+            expect(created_outbox_record.resource_id).to eq resource.id.to_s
+            expect(created_outbox_record.topic).to eq "v102_rentals"
+            expect(created_outbox_record.changeset).to eq({})
+            expect(created_outbox_record.partition_key).to eq("0")
+            expect(observer_outbox_record.event_name).to eq "example_publishable_cancelable_resource_destroyed"
+            expect(observer_outbox_record.resource_class).to eq "ExamplePublishableCancelableResource"
+            expect(observer_outbox_record.resource_id).to eq resource.id.to_s
+            expect(observer_outbox_record.topic).to eq "__outbox_observer__"
+            expect(observer_outbox_record.changeset).to eq({
+              "canceled_at" => ["2022-08-21T08:01:47.000Z", "2022-08-22T08:01:47.000Z"],
+              "updated_at" => ["2022-08-21T08:01:47.000Z", "2022-08-22T08:01:47.000Z"]
+            })
+            expect(observer_outbox_record.partition_key).to be_nil
+          end
         end
       end
 
