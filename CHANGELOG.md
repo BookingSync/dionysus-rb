@@ -1,4 +1,6 @@
 ## [Unreleased]
+
+## [0.3.0]
 - Allow to provide multiple message filters. `message_filter` stays for backwards compatibility and depends on `message_filters`.
 
 ## [0.2.0]

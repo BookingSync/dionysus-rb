@@ -1,7 +1,7 @@
 PATH
   remote: .
   specs:
-    dionysus-rb (0.2.0)
+    dionysus-rb (0.3.0)
       activerecord (>= 5)
       activesupport (>= 3.2)
       concurrent-ruby
