@@ -27,8 +27,9 @@ class Dionysus::Consumer::ParamsBatchProcessor
             transformed_data = Dionysus::Consumer::Deserializer.new(data).deserialize
           end
 
-          if ignore_message?(topic: topic, message: message, transformed_data: transformed_data)
-            notify_about_ignored_message(topic: topic, message: message, transformed_data: transformed_data)
+          if (applicable_message_filter = find_applicable_message_filter(topic, message, transformed_data))
+            applicable_message_filter.notify_about_ignored_message(topic: topic, message: message,
+              transformed_data: transformed_data)
             next
           end
 
@@ -50,8 +51,11 @@ class Dionysus::Consumer::ParamsBatchProcessor
 
   private
 
-  delegate :message_filter, to: :config
-  delegate :ignore_message?, :notify_about_ignored_message, to: :message_filter
+  delegate :message_filters, to: :config
+
+  def find_applicable_message_filter(topic, message, transformed_data)
+    message_filters.find { |f| f.ignore_message?(topic: topic, message: message, transformed_data: transformed_data) }
+  end
 
   def instrument(label, options = {}, &block)
     config.instrumenter.instrument(label, options, &block)

@@ -446,6 +446,237 @@ RSpec.describe Dionysus::Consumer::KarafkaConsumerGenerator do
             expect(error_handler).to have_received(:capture_message).with(%r{Ignoring Kafka message})
           end
         end
+
+        context "when multiple filters are specified" do
+          let(:error_handler) { Dionysus::Utils::NullErrorHandler }
+          let(:rental_1) do
+            RentalWithModifiedTimestampsForKarafkaConsumerTest.new(synced_id: 1)
+          end
+          let(:rental_2) do
+            RentalWithModifiedTimestampsForKarafkaConsumerTest.new(synced_id: 2)
+          end
+          let(:message_payload) do
+            {
+              "message" => [event_1, event_2]
+            }
+          end
+          let(:event_1) do
+            {
+              "event" => "rental_created",
+              "model_name" => "Rental",
+              "data" => [data_1]
+            }
+          end
+          let(:event_2) do
+            {
+              "event" => "rental_created",
+              "model_name" => "Rental",
+              "data" => [data_2]
+            }
+          end
+          let(:data_1) do
+            {
+              "links" => {},
+              "id" => 1,
+              "name" => "Villa Saganaki",
+              "updated_at" => updated_at,
+              "created_at" => created_at
+            }
+          end
+          let(:data_2) do
+            {
+              "links" => {},
+              "id" => 2,
+              "name" => "Villa Thalassa",
+              "updated_at" => updated_at,
+              "created_at" => created_at
+            }
+          end
+          let(:updated_at) { 102 }
+          let(:created_at) { 101 }
+
+          before do
+            DBForKarafkaConsumerTest.rentals << rental_1
+            DBForKarafkaConsumerTest.rentals << rental_2
+            allow(error_handler).to receive(:capture_message).and_call_original
+            allow(custom_message_filter_1).to receive(:notify_about_ignored_message).and_call_original
+            allow(custom_message_filter_2).to receive(:notify_about_ignored_message).and_call_original
+          end
+
+          context "when none of the filters are supposed to ignore the message" do
+            let(:config) do
+              Dionysus::Consumer::Config.new.tap do |current_config|
+                model_factory_for_karafka_consumer_test = ModelFactoryForKarafkaConsumerTest
+                current_config.model_factory = model_factory_for_karafka_consumer_test.new
+                current_config.transaction_provider = transaction_provider
+                current_config.synced_created_at_timestamp_attribute = :bookingsync_created_at
+                current_config.synced_updated_at_timestamp_attribute = :bookingsync_updated_at
+                current_config.soft_deleted_at_timestamp_attribute = :bookingsync_canceled_at
+                current_config.synced_data_attribute = :bookingsync_data
+                current_config.message_filters = [custom_message_filter_1, custom_message_filter_2]
+              end
+            end
+            let(:custom_message_filter_1) do
+              Class.new(Dionysus::Utils::DefaultMessageFilter) do
+                attr_reader :topic, :message, :transformed_data
+
+                def ignore_message?(topic:, message:, transformed_data:)
+                  @topic = topic
+                  @message = message
+                  @transformed_data = transformed_data
+
+                  false
+                end
+              end.new(error_handler: error_handler)
+            end
+            let(:custom_message_filter_2) do
+              Class.new(Dionysus::Utils::DefaultMessageFilter) do
+                attr_reader :topic, :message, :transformed_data
+
+                def ignore_message?(topic:, message:, transformed_data:)
+                  @topic = topic
+                  @message = message
+                  @transformed_data = transformed_data
+
+                  false
+                end
+              end.new(error_handler: error_handler)
+            end
+
+            it "does processes the messages" do
+              expect do
+                consume
+              end.to change { rental_1.bookingsync_created_at }
+                .and change { rental_1.bookingsync_updated_at }
+                .and change { rental_2.bookingsync_created_at }
+                .and change { rental_2.bookingsync_updated_at }
+            end
+
+            it "does not notify about ignored message" do
+              consume
+
+              expect(error_handler).not_to have_received(:capture_message).with(%r{Ignoring Kafka message})
+              expect(custom_message_filter_1).not_to have_received(:notify_about_ignored_message)
+              expect(custom_message_filter_2).not_to have_received(:notify_about_ignored_message)
+            end
+          end
+
+          context "when all of the filters are supposed to ignore messages" do
+            let(:config) do
+              Dionysus::Consumer::Config.new.tap do |current_config|
+                model_factory_for_karafka_consumer_test = ModelFactoryForKarafkaConsumerTest
+                current_config.model_factory = model_factory_for_karafka_consumer_test.new
+                current_config.transaction_provider = transaction_provider
+                current_config.synced_created_at_timestamp_attribute = :bookingsync_created_at
+                current_config.synced_updated_at_timestamp_attribute = :bookingsync_updated_at
+                current_config.soft_deleted_at_timestamp_attribute = :bookingsync_canceled_at
+                current_config.synced_data_attribute = :bookingsync_data
+                current_config.message_filters = [custom_message_filter_1, custom_message_filter_2]
+              end
+            end
+            let(:custom_message_filter_1) do
+              Class.new(Dionysus::Utils::DefaultMessageFilter) do
+                attr_reader :topic, :message, :transformed_data
+
+                def ignore_message?(topic:, message:, transformed_data:)
+                  @topic = topic
+                  @message = message
+                  @transformed_data = transformed_data
+
+                  transformed_data.first.attributes.fetch("synced_id") == 1
+                end
+              end.new(error_handler: error_handler)
+            end
+            let(:custom_message_filter_2) do
+              Class.new(Dionysus::Utils::DefaultMessageFilter) do
+                attr_reader :topic, :message, :transformed_data
+
+                def ignore_message?(topic:, message:, transformed_data:)
+                  @topic = topic
+                  @message = message
+                  @transformed_data = transformed_data
+
+                  transformed_data.first.attributes.fetch("synced_id") == 1
+                end
+              end.new(error_handler: error_handler)
+            end
+
+            it "does not process the message to be ignored and processes the rest" do
+              expect do
+                consume
+              end.to avoid_changing { rental_1.bookingsync_created_at }
+                .and avoid_changing { rental_1.bookingsync_updated_at }
+                .and change { rental_2.bookingsync_created_at }
+                .and change { rental_2.bookingsync_updated_at }
+            end
+
+            it "notifies about ignored message" do
+              consume
+
+              expect(error_handler).to have_received(:capture_message).with(%r{Ignoring Kafka message}).once
+              expect(custom_message_filter_1).to have_received(:notify_about_ignored_message)
+              expect(custom_message_filter_2).not_to have_received(:notify_about_ignored_message)
+            end
+          end
+
+          context "when only one of the filters is supposed to ignore messages" do
+            let(:config) do
+              Dionysus::Consumer::Config.new.tap do |current_config|
+                model_factory_for_karafka_consumer_test = ModelFactoryForKarafkaConsumerTest
+                current_config.model_factory = model_factory_for_karafka_consumer_test.new
+                current_config.transaction_provider = transaction_provider
+                current_config.synced_created_at_timestamp_attribute = :bookingsync_created_at
+                current_config.synced_updated_at_timestamp_attribute = :bookingsync_updated_at
+                current_config.soft_deleted_at_timestamp_attribute = :bookingsync_canceled_at
+                current_config.synced_data_attribute = :bookingsync_data
+                current_config.message_filters = [custom_message_filter_1, custom_message_filter_2]
+              end
+            end
+            let(:custom_message_filter_1) do
+              Class.new(Dionysus::Utils::DefaultMessageFilter) do
+                attr_reader :topic, :message, :transformed_data
+
+                def ignore_message?(topic:, message:, transformed_data:)
+                  @topic = topic
+                  @message = message
+                  @transformed_data = transformed_data
+
+                  transformed_data.first.attributes.fetch("synced_id") == 1
+                end
+              end.new(error_handler: error_handler)
+            end
+            let(:custom_message_filter_2) do
+              Class.new(Dionysus::Utils::DefaultMessageFilter) do
+                attr_reader :topic, :message, :transformed_data
+
+                def ignore_message?(topic:, message:, transformed_data:)
+                  @topic = topic
+                  @message = message
+                  @transformed_data = transformed_data
+
+                  false
+                end
+              end.new(error_handler: error_handler)
+            end
+
+            it "does not process the message to be ignored and processes the rest" do
+              expect do
+                consume
+              end.to avoid_changing { rental_1.bookingsync_created_at }
+                .and avoid_changing { rental_1.bookingsync_updated_at }
+                .and change { rental_2.bookingsync_created_at }
+                .and change { rental_2.bookingsync_updated_at }
+            end
+
+            it "notifies about ignored message" do
+              consume
+
+              expect(error_handler).to have_received(:capture_message).with(%r{Ignoring Kafka message}).once
+              expect(custom_message_filter_1).to have_received(:notify_about_ignored_message)
+              expect(custom_message_filter_2).not_to have_received(:notify_about_ignored_message)
+            end
+          end
+        end
       end
 
       describe "_created event" do

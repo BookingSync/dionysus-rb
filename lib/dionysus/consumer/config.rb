@@ -6,7 +6,7 @@ class Dionysus::Consumer::Config
     :instrumenter, :event_bus, :soft_delete_strategy, :soft_deleted_at_timestamp_attribute,
     :synced_created_at_timestamp_attribute, :synced_updated_at_timestamp_attribute, :synced_id_attribute,
     :synced_data_attribute, :consumer_base_class, :retry_provider, :resolve_synced_data_hash_proc, :sidekiq_queue,
-    :message_filter
+    :message_filters
 
   def self.default_sidekiq_queue
     :dionysus
@@ -93,5 +93,14 @@ class Dionysus::Consumer::Config
   def message_filter
     @message_filter || Dionysus::Utils::DefaultMessageFilter.new(error_handler:
       Dionysus::Utils::NullErrorHandler)
+  end
+
+  def message_filter=(val)
+    @message_filter = val
+    self.message_filters = [val]
+  end
+
+  def message_filters
+    @message_filters || Array.wrap(message_filter)
   end
 end
