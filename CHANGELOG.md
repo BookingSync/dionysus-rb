@@ -1,4 +1,5 @@
 ## [Unreleased]
+- Allow to provide multiple message filters. `message_filter` stays for backwards compatibility and depends on `message_filters`.
 
 ## [0.2.0]
 - Fix creation of outbox records when updating a record that was soft-deleted

@@ -297,19 +297,50 @@ RSpec.describe Dionysus::Consumer::Config do
     end
   end
 
-  describe "#message_filter/message_filter=" do
-    subject(:message_filter) { config.message_filter }
+  describe "#message_filter/message_filters/message_filter=" do
+    subject(:message_filters) { config.message_filters }
+
+    let(:message_filter) { config.message_filter }
 
     let(:config) { described_class.new }
+    let(:null_error_handler) do
+      Dionysus::Utils::DefaultMessageFilter.new(error_handler: Dionysus::Utils::NullErrorHandler)
+    end
 
     context "when message_filter is not specified" do
-      it { is_expected.to be_a Dionysus::Utils::DefaultMessageFilter }
+      specify do
+        expect(message_filter).to be_a(Dionysus::Utils::DefaultMessageFilter)
+        expect(message_filters.count).to eq 1
+        expect(message_filters.first).to be_a(Dionysus::Utils::DefaultMessageFilter)
+      end
     end
 
     context "when message_filter is specified" do
       before { config.message_filter = "message_filter" }
 
-      it { is_expected.to eq "message_filter" }
+      specify do
+        expect(message_filter).to eq "message_filter"
+        expect(message_filters).to eq ["message_filter"]
+      end
+    end
+  end
+
+  describe "#message_filters/message_filters=" do
+    subject(:message_filters) { config.message_filters }
+
+    let(:config) { described_class.new }
+
+    context "when message_filter is not specified" do
+      specify do
+        expect(message_filters.count).to eq 1
+        expect(message_filters.first).to be_a(Dionysus::Utils::DefaultMessageFilter)
+      end
+    end
+
+    context "when message_filter is specified" do
+      before { config.message_filters = ["message_filter"] }
+
+      it { is_expected.to eq ["message_filter"] }
     end
   end
 end
