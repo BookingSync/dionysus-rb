@@ -1,5 +1,7 @@
 ## [Unreleased]
-- Allow `Bookingsync::Prometheus::Producer::Genesis::StreamJob`/`Bookingsync::Prometheus::Producer::Genesis::Streamer` to take more options and perform filtering by extra conditions. This is useful if you only need to stream some of the records.
+
+## [0.4.0]
+- Allow `Dionysus::Producer::Genesis::StreamJob`/`Dionysus::Producer::Genesis::Streamer` to take more options and perform filtering by extra conditions. This is useful if you only need to stream some of the records.
 
 ## [0.3.0]
 - Allow to provide multiple message filters. `message_filter` stays for backwards compatibility and depends on `message_filters`.
