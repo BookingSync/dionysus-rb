@@ -32,7 +32,7 @@ class Dionysus::Producer::Genesis
   def enqueue_stream_model_for_topic(topic, model, from, to, number_of_days, streamer_job)
     Dionysus::Producer::Genesis::StreamJob
       .set(queue: sidekiq_queue)
-      .perform_async(topic.to_s, model.to_s, from.as_json, to.as_json, number_of_days.to_i, streamer_job.to_s)
+      .perform_async(topic.to_s, model.to_s, from.as_json, to.as_json, number_of_days.to_i, streamer_job.to_s, {})
   end
 
   def publish_genesis_performed(model:, topic:, number_of_days:)

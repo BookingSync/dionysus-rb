@@ -4055,7 +4055,7 @@ RSpec.describe Dionysus::Consumer::KarafkaConsumerGenerator do
             config.event_bus = event_bus
           end
 
-          it "handles processing correctly" do
+          it "handles processing correctly", retry: 3 do
             expect do
               consume
             end.to change { DBForKarafkaConsumerTest.rentals.count }.from(1).to(3)

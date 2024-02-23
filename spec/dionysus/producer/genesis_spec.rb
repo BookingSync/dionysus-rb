@@ -72,13 +72,13 @@ RSpec.describe Dionysus::Producer::Genesis do
     context "when all checks pass" do
       it "enqueues a stream job" do
         expect(Dionysus::Producer::Genesis::StreamJob).not_to have_enqueued_sidekiq_job(
-          topic, model.to_s, 1.day.ago.as_json, 1.day.from_now.as_json, 7, job_klass
+          topic, model.to_s, 1.day.ago.as_json, 1.day.from_now.as_json, 7, job_klass, {}
         )
 
         stream
 
         expect(Dionysus::Producer::Genesis::StreamJob).to have_enqueued_sidekiq_job(
-          topic, model.to_s, 1.day.ago.as_json, 1.day.from_now.as_json, 7, job_klass
+          topic, model.to_s, 1.day.ago.as_json, 1.day.from_now.as_json, 7, job_klass, {}
         )
       end
 
