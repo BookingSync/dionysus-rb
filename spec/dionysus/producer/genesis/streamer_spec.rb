@@ -29,6 +29,7 @@ RSpec.describe Dionysus::Producer::Genesis::Streamer do
       end
 
       allow(streamer_job).to receive(:enqueue).and_call_original
+      model.delete_all
     end
 
     context "when no options and no timeline are specified" do
@@ -122,6 +123,33 @@ RSpec.describe Dionysus::Producer::Genesis::Streamer do
           topic,
           number_of_days: 7,
           batch_size: 10
+        )
+      end
+    end
+
+    context "when :query_conditions are provided" do
+      let(:model) { ExampleResource }
+      let(:from) { nil }
+      let(:to) { nil }
+      let(:options) do
+        {
+          query_conditions: { account_id: 1 }
+        }
+      end
+
+      let!(:example_resource_1) { model.create(account_id: 1) }
+      let!(:example_resource_2) { model.create(account_id: 1) }
+      let!(:example_resource_3) { model.create(account_id: 2) }
+
+      it "enqueues streamer_job with filtered resources" do
+        stream
+
+        expect(streamer_job).to have_received(:enqueue).with(
+          model.where(id: [example_resource_1.id, example_resource_2.id]).to_a,
+          model,
+          topic,
+          number_of_days: 1,
+          batch_size: 1000
         )
       end
     end
