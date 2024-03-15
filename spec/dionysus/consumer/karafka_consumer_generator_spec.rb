@@ -3318,6 +3318,96 @@ RSpec.describe Dionysus::Consumer::KarafkaConsumerGenerator do
             let(:expected_events) do
               [
                 [
+                  "dionysus.consume_batch",
+                  [
+                    {
+                      topic_name: "v8_rentals",
+                      event_name: "rental_updated",
+                      model_name: "Rental",
+                      transformed_data: [
+                        attributes: {
+                          "synced_tax_id" => 201,
+                          "synced_booking_ids" => [101, 102],
+                          "synced_account_id" => 300,
+                          "synced_id" => 1,
+                          "name" => "Villa Saganaki",
+                          "non_relationship" => [
+                            { "id" => 1 }
+                          ]
+                        },
+                        has_many: [
+                          [
+                            "bookings",
+                            [
+                              {
+                                attributes: {
+                                  "synced_id" => 101,
+                                  "start_at" => 1
+                                },
+                                has_many: [],
+                                has_one: []
+                              },
+                              {
+                                attributes: {
+                                  "synced_id" => 102,
+                                  "start_at" => 22
+                                },
+                                has_many: [],
+                                has_one: []
+                              }
+                            ]
+                          ]
+                        ],
+                        has_one: [
+                          [
+                            "tax",
+                            {
+                              attributes: {
+                                "synced_id" => 201,
+                                "name" => "VAT"
+                              },
+                              has_many: [],
+                              has_one: []
+                            }
+                          ],
+                          [
+                            "account",
+                            {
+                              attributes:
+                                {
+                                  "synced_id" => 300,
+                                  "name" => "#WhateverItTakes"
+                                },
+                              has_many: [],
+                              has_one: []
+                            }
+                          ]
+                        ]
+                      ],
+                      local_changes: {
+                        ["Rental", 1] => { "name" => ["old name", "Villa Saganaki"] },
+                        ["bookings", 101] => { "start_at" => [nil, 1] },
+                        ["bookings", 102] => { "start_at" => [2, 22] },
+                        ["tax", 201] => { "name" => [nil, "VAT"] },
+                        ["account", 300] => { "name" => ["Discipline Equals Freedom", "#WhateverItTakes"] }
+                      }
+                    },
+                    {
+                      topic_name: "v8_rentals",
+                      event_name: "rental_destroyed",
+                      model_name: "Rental",
+                      transformed_data: [
+                        attributes: {
+                          "synced_id" => 10_101
+                        },
+                        has_many: [],
+                        has_one: []
+                      ],
+                      local_changes: {}
+                    }
+                  ]
+                ],
+                [
                   "dionysus.consume",
                   {
                     topic_name: "v8_rentals",
@@ -3887,10 +3977,10 @@ RSpec.describe Dionysus::Consumer::KarafkaConsumerGenerator do
               consume
             end
 
-            it "publishes events correctly in the end" do
+            it "publishes events correctly" do
               expect do
                 consume
-              end.to change { event_bus.events.count }.from(0).to(3)
+              end.to change { event_bus.events.count }.from(0).to(4)
             end
           end
 
@@ -4068,10 +4158,10 @@ RSpec.describe Dionysus::Consumer::KarafkaConsumerGenerator do
             expect(consumer).to have_received(:process_batch).exactly(1)
           end
 
-          it "publishes events correctly in the end" do
+          it "publishes events correctly" do
             expect do
               consume
-            end.to change { event_bus.events.count }.from(0).to(3)
+            end.to change { event_bus.events.count }.from(0).to(4)
           end
         end
       end

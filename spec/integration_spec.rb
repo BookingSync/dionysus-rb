@@ -157,7 +157,7 @@ RSpec.describe "Integration scenario" do
       end.to change { DBForKarafkaConsumerTest.rentals.count }.from(0)
         .and change {
                event_bus.messages.count
-             }.from(0).to(1) # only for rental_created, tombstone is not considered here
+             }.from(0).to(2) # only for rental_created, tombstone is not considered here
         .and change { transaction_provider.counter }.from(0).to(2)
     end
   end

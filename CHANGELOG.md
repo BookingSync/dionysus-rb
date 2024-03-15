@@ -1,4 +1,5 @@
 ## [Unreleased]
+- Publish consumed messages batch as `dionysus.consume_batch` event.
 
 ## [0.4.0]
 - Allow `Dionysus::Producer::Genesis::StreamJob`/`Dionysus::Producer::Genesis::Streamer` to take more options and perform filtering by extra conditions. This is useful if you only need to stream some of the records.

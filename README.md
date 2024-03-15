@@ -194,7 +194,7 @@ Dionysus::Producer.responders_for(Record).each do |responder|
   message = [].tap do |current_message|
     current_message << ["record_created", created_records.to_a, {}]
     if canceled_records.any?
-      current_message << ["record_destroyed", canceled_records.map { |record| RecordPrometheusDTO.new(record) }, { serialize: false }]
+      current_message << ["record_destroyed", canceled_records.map { |record| RecordDionysusDTO.new(record) }, { serialize: false }]
     end
   end
 
@@ -1137,7 +1137,7 @@ Dionysus::Consumer.configure do |config|
   config.resolve_synced_data_hash_proc = ->(record) { record.synced_data_model.synced_data_hash } # optional, defaults to ->(record) { record.public_send(Dionysus::Consumer.configuration.synced_data_attribute).to_h }
   config.sidekiq_queue = :default # optional, defaults to `:dionysus`
   config.message_filter = FilterIgnoringLargeMessageToAvoidOutofMemoryErrors.new(error_handler: Sentry) #  DEPRECATED - not required, defaults to Dionysus::Utils::DefaultMessageFilter, which doesn't ignore any messages. It can be useful when you want to ignore some messages, e.g. some very large ones that would cause OOM error. Check the implementation of `Dionysus::Utils::DefaultMessageFilter for more details to understand what kind of arguments are available to set the condition. `error_handler` needs to implement Sentry-like interface. Kept for backwards compatibility, please use `message_filters` instead.
-  config.message_filters = [FilterIgnoringLargeMessageToAvoidOutofMemoryErrors.new(error_handler: Sentry)] # not required, defaults to [Dionysus::Utils::DefaultMessageFilter], which doesn't ignore any messages. It can be useful when you want to ignore some messages, e.g. some very large ones that would cause OOM error. Check the implementation of `Dionysus::Utils::DefaultMessageFilter for more details to understand what kind of arguments are available to set the condition. `error_handler` needs to implement Sentry-like interface. 
+  config.message_filters = [FilterIgnoringLargeMessageToAvoidOutofMemoryErrors.new(error_handler: Sentry)] # not required, defaults to [Dionysus::Utils::DefaultMessageFilter], which doesn't ignore any messages. It can be useful when you want to ignore some messages, e.g. some very large ones that would cause OOM error. Check the implementation of `Dionysus::Utils::DefaultMessageFilter for more details to understand what kind of arguments are available to set the condition. `error_handler` needs to implement Sentry-like interface.
 
   # if you ever need to provide mapping:
 
@@ -1154,7 +1154,9 @@ end
 
 Check publisher for reference about instrumentation and event bus. The only difference is about the methods that are instrumented and events that are published.
 
-For the event bus, you may expect the `dionysus.consume` event. It contains the following attributes:
+For the event bus, you may expect two events:
+
+1. `dionysus.consume` event. It contains the following attributes:
 - `topic_name`, e.g. "v3_inbox", "v3_rentals"
 - `model_name`, e.g. "Conversation", "Rental"
 - `event_name`, e.g. "rental_created", "converation_updated", "message_destroyed"
@@ -1167,6 +1169,8 @@ For the event bus, you may expect the `dionysus.consume` event. It contains the 
   ["bookings", 101] => {"start_at" => [nil, 1] }
 }
 ```
+
+2. `dionysus.consume_batch` event. It's essentially an array of events available under `dionysus.consume` event representing an entire Karafka consumers messages' batch.
 
 Event bus is the recommended way to do something upon consuming events if you want to avoid putting that logic into ActiveRecord callbacks.
 
