@@ -11,8 +11,10 @@ class Dionysus::Consumer::BatchEventsPublisher
 
   def publish(processed_events)
     processed_events
-      .map(&method(:to_event_data))
-      .each(&method(:publish_via_event_bus))
+      .map { |dionysus_event| to_event_data(dionysus_event) }
+      .select(&:present?) # potentially necessary for some Kafka versions? couldn't reproduce this reliably, but the integration spec added a tombstone message for `publish_events_batch_via_event_bus` in the older version
+      .then { |mapped_events| publish_events_batch_via_event_bus(mapped_events) }
+      .then { |mapped_events| mapped_events.each { |event_data| publish_single_event_via_event_bus(event_data) } }
   end
 
   private
@@ -27,7 +29,12 @@ class Dionysus::Consumer::BatchEventsPublisher
     }
   end
 
-  def publish_via_event_bus(event_data)
+  def publish_events_batch_via_event_bus(events_batch_data)
+    config.event_bus.publish("dionysus.consume_batch", events_batch_data)
+    events_batch_data
+  end
+
+  def publish_single_event_via_event_bus(event_data)
     config.event_bus.publish("dionysus.consume", event_data)
   end
 end
