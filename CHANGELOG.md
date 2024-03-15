@@ -1,4 +1,6 @@
 ## [Unreleased]
+
+## [0.5.0]
 - Publish consumed messages batch as `dionysus.consume_batch` event.
 
 ## [0.4.0]
