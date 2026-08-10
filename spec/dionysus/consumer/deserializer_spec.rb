@@ -71,88 +71,90 @@ RSpec.describe Dionysus::Consumer::Deserializer do
 
       let(:deserialized_canonical_format) do
         [
-          attributes: {
-            "comments" => [{ "content" => "comment" }],
-            "name" => "BookingSync",
-            "settings" => { "default_arrival_time" => 11 },
-            "synced_account_id" => 2,
-            "synced_created_at" => "2020-01-01 12:00:00",
-            "synced_fee_id" => 10,
-            "synced_id" => 1,
-            "synced_rental_id" => nil,
-            "synced_bookable_id" => 123,
-            "synced_bookable_type" => "Property",
-            "synced_empty_bookable_id" => nil,
-            "synced_empty_bookable_type" => nil,
-            "synced_updated_at" => "2020-01-02 12:00:01",
-            "synced_canceled_at" => "2020-01-02 12:00:02",
-            "synced_booking_ids" => [3, 4],
-            "synced_client_ids" => [20],
-            "synced_tax_ids" => [],
-            "synced_user_ids" => []
-          },
-          has_many: [
-            ["bookings", nil],
-            ["taxes", nil],
-            [
-              "clients",
+          {
+            attributes: {
+              "comments" => [{ "content" => "comment" }],
+              "name" => "BookingSync",
+              "settings" => { "default_arrival_time" => 11 },
+              "synced_account_id" => 2,
+              "synced_created_at" => "2020-01-01 12:00:00",
+              "synced_fee_id" => 10,
+              "synced_id" => 1,
+              "synced_rental_id" => nil,
+              "synced_bookable_id" => 123,
+              "synced_bookable_type" => "Property",
+              "synced_empty_bookable_id" => nil,
+              "synced_empty_bookable_type" => nil,
+              "synced_updated_at" => "2020-01-02 12:00:01",
+              "synced_canceled_at" => "2020-01-02 12:00:02",
+              "synced_booking_ids" => [3, 4],
+              "synced_client_ids" => [20],
+              "synced_tax_ids" => [],
+              "synced_user_ids" => []
+            },
+            has_many: [
+              ["bookings", nil],
+              ["taxes", nil],
               [
-                {
-                  attributes: { "synced_message_ids" => [201], "fullname" => "Rich Piana", "synced_id" => 20 },
-                  has_many: [
-                    [
-                      "messages",
+                "clients",
+                [
+                  {
+                    attributes: { "synced_message_ids" => [201], "fullname" => "Rich Piana", "synced_id" => 20 },
+                    has_many: [
                       [
-                        {
-                          attributes: { "message" => "inbox message", "synced_id" => 201 },
-                          has_many: [],
-                          has_one: []
-                        }
+                        "messages",
+                        [
+                          {
+                            attributes: { "message" => "inbox message", "synced_id" => 201 },
+                            has_many: [],
+                            has_one: []
+                          }
+                        ]
                       ]
+                    ],
+                    has_one: []
+                  }
+                ]
+              ],
+              ["users", nil]
+            ],
+            has_one: [
+              ["account", nil],
+              [
+                "fee",
+                {
+                  attributes: { "name" => "cleaning", "synced_id" => 10, "synced_rentals_fee_id" => 101 },
+                  has_many: [],
+                  has_one: [
+                    [
+                      "rentals_fee",
+                      {
+                        attributes: {
+                          "always_applied" => true,
+                          "synced_created_at" => "2021-01-01 12:00:00",
+                          "synced_id" => 101,
+                          "synced_updated_at" => "2021-01-02 12:00:01",
+                          "synced_canceled_at" => "2021-01-02 12:00:02"
+                        },
+                        has_many: [],
+                        has_one: []
+                      }
                     ]
-                  ],
+                  ]
+                }
+              ],
+              ["rental", nil],
+              [
+                "Property",
+                {
+                  attributes: { "synced_id" => 123, "synced_created_at" => "2100-01-01 12:00:00" },
+                  has_many: [],
                   has_one: []
                 }
-              ]
-            ],
-            ["users", nil]
-          ],
-          has_one: [
-            ["account", nil],
-            [
-              "fee",
-              {
-                attributes: { "name" => "cleaning", "synced_id" => 10, "synced_rentals_fee_id" => 101 },
-                has_many: [],
-                has_one: [
-                  [
-                    "rentals_fee",
-                    {
-                      attributes: {
-                        "always_applied" => true,
-                        "synced_created_at" => "2021-01-01 12:00:00",
-                        "synced_id" => 101,
-                        "synced_updated_at" => "2021-01-02 12:00:01",
-                        "synced_canceled_at" => "2021-01-02 12:00:02"
-                      },
-                      has_many: [],
-                      has_one: []
-                    }
-                  ]
-                ]
-              }
-            ],
-            ["rental", nil],
-            [
-              "Property",
-              {
-                attributes: { "synced_id" => 123, "synced_created_at" => "2100-01-01 12:00:00" },
-                has_many: [],
-                has_one: []
-              }
-            ],
-            ["empty_bookable", nil]
-          ]
+              ],
+              ["empty_bookable", nil]
+            ]
+          }
         ]
       end
 

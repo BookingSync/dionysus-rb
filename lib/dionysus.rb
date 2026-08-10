@@ -20,7 +20,7 @@ module Dionysus
     end
   end
 
-  def self.initialize_application!(environment:, seed_brokers:, client_id:, logger:, draw_routing: true, consumer_group_prefix: CONSUMER_GROUP_PREFIX)
+  def self.initialize_application!(environment:, seed_brokers:, client_id:, logger:, draw_routing: true, consumer_group_prefix: CONSUMER_GROUP_PREFIX, consumer_group_name: nil)
     ENV["KARAFKA_ENV"] = environment
 
     karafka_app = Class.new(Karafka::App) do
@@ -37,7 +37,10 @@ module Dionysus
 
     Object.const_set(:KarafkaApp, karafka_app)
     self.karafka_application = karafka_app
-    evaluate_routing(consumer_group_prefix: consumer_group_prefix) if consumer_registry.present? && draw_routing
+    return unless consumer_registry.present? && draw_routing
+
+    consumer_group_name ||= "#{consumer_group_prefix}_#{karafka_application.config.client_id}"
+    evaluate_routing(consumer_group_name: consumer_group_name)
   end
 
   def self.karafka_application=(karafka_app)
@@ -110,12 +113,11 @@ module Dionysus
     @monitor ||= Dionysus::Monitor.new
   end
 
-  def self.evaluate_routing(consumer_group_prefix:)
-    consumer_group_name = "#{consumer_group_prefix}_#{karafka_application.config.client_id}"
+  def self.evaluate_routing(consumer_group_name:)
     karafka_application.instance_exec(consumer_registry) do |registry|
       consumer_groups.draw do
         consumer_group consumer_group_name do
-          registry.registrations.each do |_, registration|
+          registry.registrations.each_value do |registration|
             registration.topics.each do |topic|
               topic topic.to_s do
                 consumer topic.consumer

@@ -8,9 +8,9 @@ class Dionysus::Producer::Registry
     @container = {}
   end
 
-  def namespace(namespace, &block)
+  def namespace(namespace, &)
     registration = Registration.new(namespace)
-    registration.instance_eval(&block)
+    registration.instance_eval(&)
     container[namespace] = registration
   end
 
@@ -32,9 +32,9 @@ class Dionysus::Producer::Registry
       @serializer_klass = serializer_klass
     end
 
-    def topic(name, options = {}, &block)
+    def topic(name, options = {}, &)
       new_topic = Topic.new(namespace, name, serializer_klass, options)
-      new_topic.instance_eval(&block)
+      new_topic.instance_eval(&)
       producer = Dionysus::Producer::KarafkaResponderGenerator.new.generate(
         Dionysus::Producer.configuration, new_topic
       )
@@ -119,7 +119,7 @@ class Dionysus::Producer::Registry
             association_name = observer_config.fetch(:association_name)
             _attributes = observer_config.fetch(:attributes)
 
-            if association_name.is_a?(Symbol) && !model.instance_methods.include?(association_name.to_sym)
+            if association_name.is_a?(Symbol) && !model.method_defined?(association_name.to_sym)
               raise ArgumentError.new("association name :#{association_name} does not exist on model #{model}")
             end
           end
@@ -156,7 +156,7 @@ class Dionysus::Producer::Registry
             config_model_name = observer_config.fetch(:model).to_s
             config_attributes = observer_config.fetch(:attributes).to_a.map(&:to_sym)
 
-            config_model_name == resource_model_name && (config_attributes & changeset_attributes).any?
+            config_model_name == resource_model_name && config_attributes.intersect?(changeset_attributes)
           end
         end
       end

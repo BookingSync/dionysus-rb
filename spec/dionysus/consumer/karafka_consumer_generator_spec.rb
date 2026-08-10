@@ -119,11 +119,15 @@ RSpec.describe Dionysus::Consumer::KarafkaConsumerGenerator do
           double(:batch_metadata))
       end
       let(:metadata) do
-        ::Karafka::Messages::Metadata.new.tap do |metadata|
-          metadata["deserializer"] = deserializer
+        Karafka::Messages::Metadata.new.tap do |metadata|
+          metadata["deserializers"] = Karafka::Routing::Features::Deserializers::Config.new(
+            payload: raw_payload_deserializer,
+            key: key_deserializer
+          )
         end
       end
-      let(:deserializer) { ->(kafka_params) { kafka_params.raw_payload } }
+      let(:raw_payload_deserializer) { lambda(&:raw_payload) }
+      let(:key_deserializer) { lambda(&:raw_key) }
 
       before do
         # forgive me for what I'm about to do
@@ -3056,7 +3060,7 @@ RSpec.describe Dionysus::Consumer::KarafkaConsumerGenerator do
             before do
               DBForKarafkaConsumerTest.rentals << rental
 
-              metadata["key"] = "Rental:1"
+              metadata[:raw_key] = "Rental:1"
             end
 
             it "uses that key for the lock" do
@@ -3325,6 +3329,100 @@ RSpec.describe Dionysus::Consumer::KarafkaConsumerGenerator do
                       event_name: "rental_updated",
                       model_name: "Rental",
                       transformed_data: [
+                        {
+                          attributes: {
+                            "synced_tax_id" => 201,
+                            "synced_booking_ids" => [101, 102],
+                            "synced_account_id" => 300,
+                            "synced_id" => 1,
+                            "name" => "Villa Saganaki",
+                            "non_relationship" => [
+                              { "id" => 1 }
+                            ]
+                          },
+                          has_many: [
+                            [
+                              "bookings",
+                              [
+                                {
+                                  attributes: {
+                                    "synced_id" => 101,
+                                    "start_at" => 1
+                                  },
+                                  has_many: [],
+                                  has_one: []
+                                },
+                                {
+                                  attributes: {
+                                    "synced_id" => 102,
+                                    "start_at" => 22
+                                  },
+                                  has_many: [],
+                                  has_one: []
+                                }
+                              ]
+                            ]
+                          ],
+                          has_one: [
+                            [
+                              "tax",
+                              {
+                                attributes: {
+                                  "synced_id" => 201,
+                                  "name" => "VAT"
+                                },
+                                has_many: [],
+                                has_one: []
+                              }
+                            ],
+                            [
+                              "account",
+                              {
+                                attributes:
+                                  {
+                                    "synced_id" => 300,
+                                    "name" => "#WhateverItTakes"
+                                  },
+                                has_many: [],
+                                has_one: []
+                              }
+                            ]
+                          ]
+                        }
+                      ],
+                      local_changes: {
+                        ["Rental", 1] => { "name" => ["old name", "Villa Saganaki"] },
+                        ["bookings", 101] => { "start_at" => [nil, 1] },
+                        ["bookings", 102] => { "start_at" => [2, 22] },
+                        ["tax", 201] => { "name" => [nil, "VAT"] },
+                        ["account", 300] => { "name" => ["Discipline Equals Freedom", "#WhateverItTakes"] }
+                      }
+                    },
+                    {
+                      topic_name: "v8_rentals",
+                      event_name: "rental_destroyed",
+                      model_name: "Rental",
+                      transformed_data: [
+                        {
+                          attributes: {
+                            "synced_id" => 10_101
+                          },
+                          has_many: [],
+                          has_one: []
+                        }
+                      ],
+                      local_changes: {}
+                    }
+                  ]
+                ],
+                [
+                  "dionysus.consume",
+                  {
+                    topic_name: "v8_rentals",
+                    event_name: "rental_updated",
+                    model_name: "Rental",
+                    transformed_data: [
+                      {
                         attributes: {
                           "synced_tax_id" => 201,
                           "synced_booking_ids" => [101, 102],
@@ -3383,95 +3481,7 @@ RSpec.describe Dionysus::Consumer::KarafkaConsumerGenerator do
                             }
                           ]
                         ]
-                      ],
-                      local_changes: {
-                        ["Rental", 1] => { "name" => ["old name", "Villa Saganaki"] },
-                        ["bookings", 101] => { "start_at" => [nil, 1] },
-                        ["bookings", 102] => { "start_at" => [2, 22] },
-                        ["tax", 201] => { "name" => [nil, "VAT"] },
-                        ["account", 300] => { "name" => ["Discipline Equals Freedom", "#WhateverItTakes"] }
                       }
-                    },
-                    {
-                      topic_name: "v8_rentals",
-                      event_name: "rental_destroyed",
-                      model_name: "Rental",
-                      transformed_data: [
-                        attributes: {
-                          "synced_id" => 10_101
-                        },
-                        has_many: [],
-                        has_one: []
-                      ],
-                      local_changes: {}
-                    }
-                  ]
-                ],
-                [
-                  "dionysus.consume",
-                  {
-                    topic_name: "v8_rentals",
-                    event_name: "rental_updated",
-                    model_name: "Rental",
-                    transformed_data: [
-                      attributes: {
-                        "synced_tax_id" => 201,
-                        "synced_booking_ids" => [101, 102],
-                        "synced_account_id" => 300,
-                        "synced_id" => 1,
-                        "name" => "Villa Saganaki",
-                        "non_relationship" => [
-                          { "id" => 1 }
-                        ]
-                      },
-                      has_many: [
-                        [
-                          "bookings",
-                          [
-                            {
-                              attributes: {
-                                "synced_id" => 101,
-                                "start_at" => 1
-                              },
-                              has_many: [],
-                              has_one: []
-                            },
-                            {
-                              attributes: {
-                                "synced_id" => 102,
-                                "start_at" => 22
-                              },
-                              has_many: [],
-                              has_one: []
-                            }
-                          ]
-                        ]
-                      ],
-                      has_one: [
-                        [
-                          "tax",
-                          {
-                            attributes: {
-                              "synced_id" => 201,
-                              "name" => "VAT"
-                            },
-                            has_many: [],
-                            has_one: []
-                          }
-                        ],
-                        [
-                          "account",
-                          {
-                            attributes:
-                              {
-                                "synced_id" => 300,
-                                "name" => "#WhateverItTakes"
-                              },
-                            has_many: [],
-                            has_one: []
-                          }
-                        ]
-                      ]
                     ],
                     local_changes: {
                       ["Rental", 1] => { "name" => ["old name", "Villa Saganaki"] },
@@ -3489,11 +3499,13 @@ RSpec.describe Dionysus::Consumer::KarafkaConsumerGenerator do
                     event_name: "rental_destroyed",
                     model_name: "Rental",
                     transformed_data: [
-                      attributes: {
-                        "synced_id" => 10_101
-                      },
-                      has_many: [],
-                      has_one: []
+                      {
+                        attributes: {
+                          "synced_id" => 10_101
+                        },
+                        has_many: [],
+                        has_one: []
+                      }
                     ],
                     local_changes: {}
                   }
@@ -3877,9 +3889,12 @@ RSpec.describe Dionysus::Consumer::KarafkaConsumerGenerator do
             }
           end
           let(:metadata_1) do
-            ::Karafka::Messages::Metadata.new.tap do |metadata|
-              metadata["deserializer"] = deserializer
-              metadata["key"] = "Rental:1"
+            Karafka::Messages::Metadata.new.tap do |metadata|
+              metadata["deserializers"] = Karafka::Routing::Features::Deserializers::Config.new(
+                payload: raw_payload_deserializer,
+                key: key_deserializer
+              )
+              metadata[:raw_key] = "Rental:1"
             end
           end
           let(:message_payload_2) do
@@ -3905,9 +3920,12 @@ RSpec.describe Dionysus::Consumer::KarafkaConsumerGenerator do
             }
           end
           let(:metadata_2) do
-            ::Karafka::Messages::Metadata.new.tap do |metadata|
-              metadata["deserializer"] = deserializer
-              metadata["key"] = "Rental:2"
+            Karafka::Messages::Metadata.new.tap do |metadata|
+              metadata["deserializers"] = Karafka::Routing::Features::Deserializers::Config.new(
+                payload: raw_payload_deserializer,
+                key: key_deserializer
+              )
+              metadata[:raw_key] = "Rental:2"
             end
           end
           let(:message_payload_3) do
@@ -3933,9 +3951,12 @@ RSpec.describe Dionysus::Consumer::KarafkaConsumerGenerator do
             }
           end
           let(:metadata_3) do
-            ::Karafka::Messages::Metadata.new.tap do |metadata|
-              metadata["deserializer"] = deserializer
-              metadata["key"] = "Rental:3"
+            Karafka::Messages::Metadata.new.tap do |metadata|
+              metadata["deserializers"] = Karafka::Routing::Features::Deserializers::Config.new(
+                payload: raw_payload_deserializer,
+                key: key_deserializer
+              )
+              metadata[:raw_key] = "Rental:3"
             end
           end
           let(:event_bus) do
@@ -4064,9 +4085,12 @@ RSpec.describe Dionysus::Consumer::KarafkaConsumerGenerator do
             }
           end
           let(:metadata_1) do
-            ::Karafka::Messages::Metadata.new.tap do |metadata|
-              metadata["deserializer"] = deserializer
-              metadata["key"] = "Rental:1"
+            Karafka::Messages::Metadata.new.tap do |metadata|
+              metadata["deserializers"] = Karafka::Routing::Features::Deserializers::Config.new(
+                payload: raw_payload_deserializer,
+                key: key_deserializer
+              )
+              metadata[:raw_key] = "Rental:1"
             end
           end
           let(:message_payload_2) do
@@ -4092,9 +4116,12 @@ RSpec.describe Dionysus::Consumer::KarafkaConsumerGenerator do
             }
           end
           let(:metadata_2) do
-            ::Karafka::Messages::Metadata.new.tap do |metadata|
-              metadata["deserializer"] = deserializer
-              metadata["key"] = "Rental:2"
+            Karafka::Messages::Metadata.new.tap do |metadata|
+              metadata["deserializers"] = Karafka::Routing::Features::Deserializers::Config.new(
+                payload: raw_payload_deserializer,
+                key: key_deserializer
+              )
+              metadata[:raw_key] = "Rental:2"
             end
           end
           let(:message_payload_3) do
@@ -4120,9 +4147,12 @@ RSpec.describe Dionysus::Consumer::KarafkaConsumerGenerator do
             }
           end
           let(:metadata_3) do
-            ::Karafka::Messages::Metadata.new.tap do |metadata|
-              metadata["deserializer"] = deserializer
-              metadata["key"] = "Rental:3"
+            Karafka::Messages::Metadata.new.tap do |metadata|
+              metadata["deserializers"] = Karafka::Routing::Features::Deserializers::Config.new(
+                payload: raw_payload_deserializer,
+                key: key_deserializer
+              )
+              metadata[:raw_key] = "Rental:3"
             end
           end
           let(:event_bus) do

@@ -103,7 +103,7 @@ RSpec.describe Dionysus::Producer::Outbox::Model, type: :model do
       ).delete_all
     end
 
-    it { is_expected.to match_array [published_outbox_record_1, published_outbox_record_3] }
+    it { is_expected.to contain_exactly(published_outbox_record_1, published_outbox_record_3) }
   end
 
   describe ".not_published", :freeze_time do
@@ -133,7 +133,7 @@ RSpec.describe Dionysus::Producer::Outbox::Model, type: :model do
       ).delete_all
     end
 
-    it { is_expected.to match_array [non_published_outbox_record_2, non_published_outbox_record_4] }
+    it { is_expected.to contain_exactly(non_published_outbox_record_2, non_published_outbox_record_4) }
   end
 
   describe "relationships" do

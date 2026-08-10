@@ -30,4 +30,12 @@ RSpec.describe Dionysus::Utils::NullInstrumenter do
       end.to change { sentinel.called }.from(false).to(true)
     end
   end
+
+  describe ".increment" do
+    subject(:increment) { described_class.increment("dionysus.publish.nothing_published", tags: ["resource:Rental"]) }
+
+    it "accepts a name and optional options and does nothing" do
+      expect { increment }.not_to raise_error
+    end
+  end
 end

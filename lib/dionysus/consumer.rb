@@ -13,9 +13,9 @@ class Dionysus::Consumer
     configuration.registry
   end
 
-  def self.declare(&config)
+  def self.declare(&)
     registry = Dionysus::Consumer::Registry.new
-    registry.instance_eval(&config)
+    registry.instance_eval(&)
 
     Dionysus.inject_routing!(registry)
 

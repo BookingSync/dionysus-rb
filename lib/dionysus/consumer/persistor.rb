@@ -151,7 +151,7 @@ class Dionysus::Consumer::Persistor
     end
   end
 
-  def instrument(label, options = {}, &block)
-    config.instrumenter.instrument(label, options, &block)
+  def instrument(label, options = {}, &)
+    config.instrumenter.instrument(label, options, &)
   end
 end

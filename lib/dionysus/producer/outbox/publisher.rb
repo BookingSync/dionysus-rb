@@ -33,8 +33,10 @@ class Dionysus::Producer::Outbox::Publisher
         return
       end
 
-      publish_for_top_level_resource(outbox_record, resource, event_name, topic, options)
-      publish_for_dependency(resource, topic, options)
+      published_count = publish_for_top_level_resource(outbox_record, resource, event_name, topic, options) +
+        publish_for_dependency(resource, topic, options)
+      handle_nothing_published(resource, event_name, topic) if published_count.zero?
+      published_count
     end
   end
 
@@ -67,19 +69,20 @@ class Dionysus::Producer::Outbox::Publisher
   delegate :logger, to: Dionysus
 
   def publish_for_top_level_resource(outbox_record, resource, event_name, topic, options)
-    Dionysus::Producer.responders_for_model_for_topic(resource.class, topic).each do |responder|
+    Dionysus::Producer.responders_for_model_for_topic(resource.class, topic).sum do |responder|
       partition_key = outbox_record.partition_key.presence || Dionysus::Producer::PartitionKey.new(
         resource
       ).to_key(responder: responder)
       key = Dionysus::Producer::Key.new(resource).to_key
 
       responder.call(generate_message(event_name, resource), options.merge(partition_key: partition_key, key: key))
+      1
     end
   end
 
   def publish_for_dependency(resource, topic, options)
     Dionysus::Producer.responders_for_dependency_parent_for_topic(resource.class,
-      topic).each do |parent_klass, responder|
+      topic).sum do |parent_klass, responder|
       parent_event_name = Dionysus::Producer::Outbox::EventName.new(
         parent_klass.model_name.singular
       ).updated
@@ -89,10 +92,11 @@ class Dionysus::Producer::Outbox::Publisher
       elsif resource.class.reflect_on_association(parent_klass.model_name.plural)
         parent_records = resource.public_send(parent_klass.model_name.plural)
       else
-        next
+        next 0
       end
 
-      example_parent_record = parent_records.first or next
+      parent_records = parent_records.to_a.compact
+      example_parent_record = parent_records.first or next 0
       partition_key = Dionysus::Producer::PartitionKey.new(example_parent_record, config: config)
         .to_key(responder: responder)
       key = Dionysus::Producer::Key.new(example_parent_record).to_key
@@ -101,7 +105,20 @@ class Dionysus::Producer::Outbox::Publisher
         responder.call(generate_message(parent_event_name, parent_record),
           options.merge(partition_key: partition_key, key: key))
       end
+      parent_records.size
     end
+  end
+
+  # Deliberately does not raise: a legitimately deleted parent is indistinguishable from
+  # one that is not visible yet, and raising on the former would retry forever.
+  def handle_nothing_published(resource, event_name, topic)
+    message = "Published nothing for #{resource.class}, id: #{resource.id}, event: #{event_name}, " \
+              "topic: #{topic} - no responder matched and no parent could be resolved. " \
+              "Make sure it's processed later (e.g. by directly doing it from console)."
+    logger.error(message)
+    instrumenter.increment("dionysus.publish.nothing_published",
+      tags: ["resource:#{resource.class}", "topic:#{topic}"])
+    error_handler.capture_message(message)
   end
 
   def publish_observer(observer_record, responder)

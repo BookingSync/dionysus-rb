@@ -30,7 +30,7 @@ class Dionysus::Consumer::BatchEventsPublisher
   end
 
   def publish_events_batch_via_event_bus(events_batch_data)
-    config.event_bus.publish("dionysus.consume_batch", events_batch_data)
+    config.event_bus.publish("dionysus.consume_batch", events_batch_data) if events_batch_data.any?
     events_batch_data
   end
 

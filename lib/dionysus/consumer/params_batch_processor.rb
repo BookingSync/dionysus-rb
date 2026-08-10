@@ -57,13 +57,13 @@ class Dionysus::Consumer::ParamsBatchProcessor
     message_filters.find { |f| f.ignore_message?(topic: topic, message: message, transformed_data: transformed_data) }
   end
 
-  def instrument(label, options = {}, &block)
-    config.instrumenter.instrument(label, options, &block)
+  def instrument(label, options = {}, &)
+    config.instrumenter.instrument(label, options, &)
   end
 
-  def with_mutex(metadata, config, &block)
+  def with_mutex(metadata, config, &)
     message_key = metadata.key || SecureRandom.uuid
     config.processing_mutex_provider.send(config.processing_mutex_method_name, "Dionysus-#{message_key}",
-      &block)
+      &)
   end
 end

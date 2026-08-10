@@ -13,10 +13,10 @@ class Dionysus::Producer
     configuration.registry
   end
 
-  def self.declare(&config)
+  def self.declare(&)
     registry = Dionysus::Producer::Registry.new
 
-    registry.instance_eval(&config)
+    registry.instance_eval(&)
     configure do |configuration|
       configuration.registry = registry
     end

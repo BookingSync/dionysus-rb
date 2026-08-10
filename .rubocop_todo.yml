@@ -52,3 +52,17 @@ Metrics/CyclomaticComplexity:
 Metrics/BlockLength:
   Exclude:
     - 'lib/dionysus/producer/karafka_responder_generator.rb'
+
+# `declared_attributes` and friends are Arrays of [name, options] pairs, not Hashes,
+# so the cop's each_key/each_value suggestion raises NoMethodError.
+Style/HashEachMethods:
+  Exclude:
+    - 'lib/dionysus/producer/model_serializer.rb'
+
+# integration_spec prints progress for a long-running Kafka run; the null provider
+# specs use `puts` as the sentinel proving the block was called.
+RSpec/Output:
+  Exclude:
+    - 'spec/dionysus/utils/null_retry_provider_spec.rb'
+    - 'spec/dionysus/utils/null_transaction_provider_spec.rb'
+    - 'spec/integration_spec.rb'

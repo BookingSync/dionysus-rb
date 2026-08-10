@@ -69,6 +69,40 @@ RSpec.describe Dionysus do
       end
     end
 
+    context "when :consumer_group_name is specified" do
+      let(:extra_initialization_options) do
+        {
+          consumer_group_name: "custom"
+        }
+      end
+
+      it "uses the provided name verbatim and still draws all the topics" do
+        initialize_application!
+
+        expect(karafka_application.consumer_groups).to be_present
+        expect(karafka_application.consumer_groups.last.name).to eq "custom"
+        expect(karafka_application.consumer_groups.last.topics.count).to eq 3
+        expect(karafka_application.consumer_groups.last.topics[0].name).to eq "v3_rentals"
+        expect(karafka_application.consumer_groups.last.topics[1].name).to eq "v4_rentals"
+        expect(karafka_application.consumer_groups.last.topics[2].name).to eq "v4_bookings"
+      end
+
+      context "when :consumer_group_prefix is also specified" do
+        let(:extra_initialization_options) do
+          {
+            consumer_group_name: "custom",
+            consumer_group_prefix: "prometheus_consumer_group_for"
+          }
+        end
+
+        it "gives precedence to the full name" do
+          initialize_application!
+
+          expect(karafka_application.consumer_groups.last.name).to eq "custom"
+        end
+      end
+    end
+
     describe "without routes evaluation" do
       let(:extra_initialization_options) do
         {

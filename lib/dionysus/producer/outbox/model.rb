@@ -78,7 +78,7 @@ module Dionysus::Producer::Outbox::Model
   end
 
   def error
-    if error_class_arity == 1 || error_class_arity == -1
+    if [1, -1].include?(error_class_arity)
       error_class.constantize.new(error_message)
     else
       StandardError.new("#{error_class_constant}: #{error_message}")

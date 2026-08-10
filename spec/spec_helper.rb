@@ -11,7 +11,7 @@ require "hermes/support/matchers/publish_async_message"
 require "sidekiq/testing"
 require "rspec/retry"
 require "rspec-sidekiq"
-require "ddtrace"
+require "datadog"
 require "sentry-ruby"
 require "crypt_keeper"
 require "shoulda-matchers"
@@ -92,6 +92,7 @@ RSpec.configure do |config|
       }
       producer_config.id = :"dionysus".to_s
     end
+    config.kafka = { 'bootstrap.servers': 'localhost:9092' }
     config.initial_offset = "latest"
   end
 

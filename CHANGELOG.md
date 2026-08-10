@@ -1,5 +1,45 @@
 ## [Unreleased]
 
+## [1.0.0]
+
+Brings `dionysus-rb` back in line with the private gem it was extracted from, which had moved on
+by four releases.
+
+### Breaking changes
+
+- Require Ruby >= 3.3 (was >= 2.7).
+- Require karafka `~> 2.4` (was `~> 2.0`). Follow https://karafka.io/docs/Upgrades-2.4/ - most
+  notably, `Karafka::Messages::Metadata` no longer carries a single `deserializer`, it carries a
+  `deserializers` config with separate `payload` and `key` entries, and `key` is now `raw_key`.
+  This only affects code that constructs metadata by hand, such as consumer specs.
+- The instrumenter is now expected to respond to `increment(name, options)` in addition to
+  `instrument`. `Dionysus::Utils::NullInstrumenter` implements it; a custom instrumenter that does
+  not will raise when a publish produces no message (see below).
+
+### Added
+
+- Notify when publishing an outbox record produces no Kafka message at all.
+  `Dionysus::Producer::Outbox::Publisher#publish` could complete successfully having sent nothing -
+  a model declared only as a `with:` dependency has no top-level responder, so when its parent
+  could not be resolved the call returned normally - and `RecordsProcessor` then marked the record
+  as published, losing the change in every consumer with no error and no retry. Such a record is
+  now logged, counted as `dionysus.publish.nothing_published` and reported through the configured
+  `error_handler`. It notifies rather than raises: the producer cannot distinguish a legitimately
+  deleted parent from one that is not visible yet.
+- `Dionysus.initialize_application!` accepts `consumer_group_name`, which is used verbatim as the
+  consumer group name and takes precedence over `consumer_group_prefix`. `consumer_group_prefix`
+  stays supported and unchanged, so the documented migration path from `bookingsync-prometheus`
+  keeps working.
+
+### Fixed
+
+- Compatibility with the `datadog` gem 2.0, which renamed the `span_type:` keyword of
+  `Datadog::Tracing#trace` to `type:`. `Dionysus::Producer::Outbox::DatadogTracer` now picks the
+  right keyword depending on whether the pre-2.0 `ddtrace` gem is loaded.
+- Do not publish the `dionysus.consume_batch` event when the batch is empty.
+- `Dionysus::Producer::Outbox::Publisher` no longer trips over a `nil` entry in a parent
+  association collection.
+
 ## [0.5.0]
 - Publish consumed messages batch as `dionysus.consume_batch` event.
 
