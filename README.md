@@ -62,7 +62,19 @@ Dionysus.initialize_application!(
 )
 ```
 
-By default, the name of the consumer grpup will be  "NAME_OF_THE_APP_dionysus_consumer_group_for_NAME_OF_THE_APP" where `dionysus_consumer_group_for` is a `consumer_group_prefix`.
+By default, the name of the consumer group will be `"dionysus_consumer_group_for_NAME_OF_THE_APP"`, where `dionysus_consumer_group_for` is the `consumer_group_prefix`.
+
+If a prefix is not enough and you need to control the entire name, provide `consumer_group_name`, which is used verbatim and takes precedence over `consumer_group_prefix`:
+
+``` rb
+Dionysus.initialize_application!(
+  environment: ENV["RAILS_ENV"],
+  seed_brokers: ENV.fetch("DIONYSUS_SEED_BROKER").split(";"),
+  client_id: "NAME_OF_THE_APP",
+  logger: Rails.logger,
+  consumer_group_name: "your_custom_consumer_group_name"
+)
+```
 
 
 And define `dionysus.rb` initializer with your Kafka topics:
@@ -234,8 +246,15 @@ class Dionysus::Utils::NullInstrumenter
   def self.instrument(name, payload = {})
     yield
   end
+
+  def self.increment(name, options = {})
+  end
 end
 ```
+
+`increment` is used for counters that are not tied to a block, currently only
+`dionysus.publish.nothing_published` (see the Transactional Outbox Pattern section). A custom
+instrumenter that does not implement it will raise when that counter is emitted.
 
 
 Event Bus is useful if you want to react to some events, with the following interface ((this is the default class)):
@@ -508,6 +527,24 @@ bundle exec outbox_worker_health_check
 
 It works for both readiness and liveness checks.
 
+##### Publishes that produce no Kafka message
+
+`Dionysus::Producer::Outbox::Publisher#publish` can legitimately match no responder at all - a
+model declared only as a `with:` dependency has no top-level responder of its own, so when its
+parent cannot be resolved nothing gets sent. The outbox record would still be stamped as
+published, which means the change is silently lost in every consumer.
+
+Such a record is now logged via `Dionysus.logger.error`, reported through the configured
+`error_handler` with `capture_message`, and counted as:
+
+```
+instrumenter.increment("dionysus.publish.nothing_published", tags: ["resource:<class>", "topic:<topic>"])
+```
+
+It notifies rather than raises, because the producer cannot tell a legitimately deleted parent
+from one that is merely not visible yet, and raising on the former would retry forever. Reprocess
+the reported record from the console.
+
 #### Tombstoning records
 
 The only way to get rid of messages under a given key from Kafka is to tombstone them. Use `Dionysus::Producer::Outbox::TombstonePublisher` to do it:
@@ -677,7 +714,19 @@ Dionysus.initialize_application!(
 )
 ```
 
-By default, the name of the consumer grpup will be  "NAME_OF_THE_APP_dionysus_consumer_group_for_NAME_OF_THE_APP" where `dionysus_consumer_group_for` is a `consumer_group_prefix`.
+By default, the name of the consumer group will be `"dionysus_consumer_group_for_NAME_OF_THE_APP"`, where `dionysus_consumer_group_for` is the `consumer_group_prefix`.
+
+If a prefix is not enough and you need to control the entire name, provide `consumer_group_name`, which is used verbatim and takes precedence over `consumer_group_prefix`:
+
+``` rb
+Dionysus.initialize_application!(
+  environment: ENV["RAILS_ENV"],
+  seed_brokers: ENV.fetch("DIONYSUS_SEED_BROKER").split(";"),
+  client_id: "NAME_OF_THE_APP",
+  logger: Rails.logger,
+  consumer_group_name: "your_custom_consumer_group_name"
+)
+```
 
 
 And define `dionysus.rb` initializer:

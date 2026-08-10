@@ -7,7 +7,7 @@ class Dionysus::Producer::BaseResponder
 
     def topic(topic_name)
       self.topics ||= {}
-      self.topics[topic_name] = topic_name.to_s
+      topics[topic_name] = topic_name.to_s
     end
 
     def call(*data)

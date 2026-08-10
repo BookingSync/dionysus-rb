@@ -4,7 +4,7 @@ jobs:
     working_directory: ~/BookingSync/dionysus-rb
     parallelism: 1
     docker:
-      - image: cimg/ruby:2.7.6
+      - image: cimg/ruby:3.3.11
         environment:
           POSTGRES_URL: "postgres://docker:docker@127.0.0.1:5432"
           DATABASE_URL: "postgres://docker:docker@127.0.0.1:5432/circle_test"

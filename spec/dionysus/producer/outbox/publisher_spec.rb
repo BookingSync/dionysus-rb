@@ -119,6 +119,53 @@ RSpec.describe Dionysus::Producer::Outbox::Publisher do
       end
     end
 
+    describe "when a dependency child's parent cannot be resolved" do
+      let(:outbox_record) do
+        DionysusOutbox.new(resource_class: child.class, resource_id: child.id, event_name: event_name, topic: topic,
+          changeset: {}, partition_key: nil)
+      end
+
+      let!(:child) { ExamplePublishableCancelableResource.create!(account_id: account_id) }
+      let(:event_name) { "example_publishable_cancelable_resource_created" }
+      let(:error_handler) { spy("error_handler") }
+
+      before do
+        allow(Karafka.producer).to receive(:produce_sync).and_call_original
+        allow(instrumenter).to receive(:increment)
+        producer_config.error_handler = error_handler
+      end
+
+      it "notifies instead of publishing, without raising" do
+        expect { publish }.not_to raise_error
+
+        expect(Karafka.producer).not_to have_received(:produce_sync)
+        expect(error_handler).to have_received(:capture_message)
+          .with(%r{Published nothing for ExamplePublishableCancelableResource})
+        expect(instrumenter).to have_received(:increment)
+          .with("dionysus.publish.nothing_published", hash_including(tags: array_including(
+            "resource:ExamplePublishableCancelableResource"
+          )))
+        expect(Dionysus.logger).to have_received(:error).with(%r{Published nothing for})
+      end
+
+      context "when the parent resolves normally" do
+        let!(:child) do
+          ExamplePublishableResource.create!(account_id: account_id,
+            example_resource: ExampleResource.create!(account_id: account_id))
+        end
+        let(:event_name) { "example_publishable_resource_created" }
+
+        it "publishes the parent and notifies nobody" do
+          publish
+
+          expect(Karafka.producer).to have_received(:produce_sync).at_least(:once)
+          expect(error_handler).not_to have_received(:capture_message)
+          expect(instrumenter).not_to have_received(:increment)
+            .with("dionysus.publish.nothing_published", anything)
+        end
+      end
+    end
+
     describe "without delivery to Kafka" do
       context "when producer is suppressed" do
         before do

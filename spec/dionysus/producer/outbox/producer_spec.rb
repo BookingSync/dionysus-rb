@@ -150,7 +150,7 @@ RSpec.describe Dionysus::Producer::Outbox::Producer do
             end
 
             it "returns all the records that were fetched to be published" do
-              expect(call).to match_array([outbox_record_3, outbox_record_1])
+              expect(call).to contain_exactly(outbox_record_3, outbox_record_1)
             end
 
             it "uses #publish method only" do
@@ -224,7 +224,7 @@ RSpec.describe Dionysus::Producer::Outbox::Producer do
             end
 
             it "returns all the records that were fetched to be published" do
-              expect(call).to match_array([outbox_record_3, outbox_record_1])
+              expect(call).to contain_exactly(outbox_record_3, outbox_record_1)
             end
 
             it "uses #publish method only" do
@@ -332,7 +332,7 @@ RSpec.describe Dionysus::Producer::Outbox::Producer do
         end
 
         it "returns the records that have been published" do
-          expect(call).to match_array([outbox_record])
+          expect(call).to contain_exactly(outbox_record)
         end
 
         it "uses #publish_observers method only" do

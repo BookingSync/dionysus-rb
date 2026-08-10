@@ -27,7 +27,7 @@ class Dionysus::Consumer::SynchronizableModel < SimpleDelegator
 
   def assign_attributes_from_dionysus(attributes)
     public_send("#{synced_data_attribute}=", attributes)
-    reverse_mapping = config.attributes_mapping_for_model(model.model_name).to_a.map(&:reverse).to_h
+    reverse_mapping = config.attributes_mapping_for_model(model.model_name).to_a.to_h(&:reverse)
 
     assignable_attributes = extract_assignable_attributes(attributes)
       .map { |key, value| apply_mapping(reverse_mapping, key, value) }

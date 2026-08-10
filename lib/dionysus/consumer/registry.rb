@@ -8,9 +8,9 @@ class Dionysus::Consumer::Registry
     @container = {}
   end
 
-  def namespace(namespace, &block)
+  def namespace(namespace, &)
     registration = Registration.new(namespace)
-    registration.instance_eval(&block)
+    registration.instance_eval(&)
     container[namespace] = registration
   end
 
@@ -32,8 +32,8 @@ class Dionysus::Consumer::Registry
       @deserializer_klass = deserializer_klass
     end
 
-    def topic(name, options = {}, &block)
-      new_topic = Topic.new(namespace, name, deserializer_klass, options, &block)
+    def topic(name, options = {}, &)
+      new_topic = Topic.new(namespace, name, deserializer_klass, options, &)
       consumer = Dionysus::Consumer::KarafkaConsumerGenerator.new.generate(
         Dionysus::Consumer.configuration, new_topic
       )

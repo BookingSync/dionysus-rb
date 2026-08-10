@@ -9,7 +9,8 @@ class Dionysus::Producer::Outbox::DatadogTracer
   end
 
   def trace(event_name, topic)
-    tracer.trace(event_name, span_type: "worker", service: self.class.service_name, on_error: error_handler) do |span|
+    tracer.trace(event_name, span_type_key => "worker", service: self.class.service_name,
+      on_error: error_handler) do |span|
       span.set_tag("topic", topic)
 
       yield
@@ -23,6 +24,16 @@ class Dionysus::Producer::Outbox::DatadogTracer
       Datadog.tracer
     else
       Datadog::Tracing
+    end
+  end
+
+  # datadog 2.0 renamed the `span_type:` keyword of Datadog::Tracing#trace to `type:`.
+  # DDTrace is only defined by the pre-2.0 ddtrace gem.
+  def span_type_key
+    if defined?(DDTrace)
+      :span_type
+    else
+      :type
     end
   end
 

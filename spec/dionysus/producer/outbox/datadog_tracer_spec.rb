@@ -30,16 +30,14 @@ RSpec.describe Dionysus::Producer::Outbox::DatadogTracer do
     end
 
     before do
-      allow(dd_tracer).to receive(:trace)
-        .with(event_name, hash_including(service: "dionysus_outbox_worker", span_type: "worker", on_error: anything))
-        .and_call_original
+      allow(dd_tracer).to receive(:trace).and_call_original
     end
 
     it "uses Datadog tracer" do
       trace
 
       expect(dd_tracer).to have_received(:trace).with(event_name,
-        hash_including(service: "dionysus_outbox_worker", span_type: "worker", on_error: anything))
+        hash_including(service: "dionysus_outbox_worker", type: "worker", on_error: anything))
     end
 
     it "yields" do

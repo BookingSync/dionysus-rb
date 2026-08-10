@@ -74,8 +74,7 @@ class Dionysus::Producer::Outbox::Publishable < SimpleDelegator
       .map(&:primary_topic)
     topics_from_dependencies = Dionysus::Producer
       .responders_for_dependency_parent(model.class)
-      .map(&:last)
-      .map(&:primary_topic)
+      .map { |dependency| dependency.last.primary_topic }
 
     [top_level_topics, topics_from_dependencies]
       .flatten
