@@ -10,18 +10,16 @@ class Dionysus::Consumer::ParamsBatchTransformations::RemoveDuplicatesStrategy
   private
 
   # the idea is following:
-  # 1. group messages by event and id - for a given model we can expect unique messages for _created and _deleted ecents
+  # 1. group messages by event and id - for a given model we can expect unique messages for _created and _deleted events
   #   but we can have multiple _updated events, so this is where we are interested in removing duplicates
-  # 2. sort each group by updated_at, reverse (because the sort is ascending) and take the first one -
-  #   this way we will have the most recent update
+  # 2. from each group keep the message published last (highest offset) - payloads are serialized at
+  #   publish time, so that is the freshest state; "updated_at" does not track it
   # 3. flatten the array of arrays as all groups will have a single item
-  # It is safer to apply sorting just for the _updated events to a given model as otherwise we could change the order of
-  #   the messages for a different type which might be not desirable
   def transform_messages_array(params_batch)
     params_batch
       .to_a
       .group_by { |batch| grouping_key_by_event_and_id(batch) }
-      .map { |_, group| group.max_by { |batch| updated_at_from_batch(batch) } }
+      .map { |_, group| group.max_by(&:offset) }
       .flatten
   end
 
@@ -30,14 +28,6 @@ class Dionysus::Consumer::ParamsBatchTransformations::RemoveDuplicatesStrategy
       batch.payload.fetch("message").first.fetch("event"),
       batch.payload.fetch("message").first["data"].first.fetch("id", nil)
     ].join
-  end
-
-  def updated_at_from_batch(batch)
-    timestamp = batch.payload.fetch("message", []).first.to_h.fetch("data", []).first.to_h.fetch("updated_at", nil)
-
-    return timestamp.to_datetime if timestamp.respond_to?(:to_datetime)
-
-    Time.current
   end
 
   def duplicates_removal_not_applicable?(params_batch)
