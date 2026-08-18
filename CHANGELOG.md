@@ -1,5 +1,11 @@
 ## [Unreleased]
 
+## [1.1.0]
+
+### Fixed
+
+- Keep the last published message when removing duplicates from a consumer batch. `RemoveDuplicatesStrategy` kept the message with the highest payload `updated_at` per event and id, but payloads are serialized at publish time, so freshness follows publish order rather than `updated_at`: a payload carrying values computed on read from associated records changes without the record's own `updated_at` changing, and can then arrive with an older `updated_at` than a staler message. Those messages were silently discarded, losing the change in every consumer with no error and no trace. The message with the highest Kafka offset is kept instead - a Karafka batch comes from a single topic-partition, so offsets strictly increase in publish order.
+
 ## [1.0.0]
 
 Brings `dionysus-rb` back in line with the private gem it was extracted from, which had moved on
