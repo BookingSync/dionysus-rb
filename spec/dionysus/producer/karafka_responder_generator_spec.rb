@@ -1426,6 +1426,29 @@ RSpec.describe Dionysus::Producer::KarafkaResponderGenerator do
         end
       end
 
+      context "when the payload is read after the stamp is taken" do
+        # ordering duplicates by the stamp is only sound while every read feeding the payload
+        # happens at or after it - a pre-loaded association would make the data older than its stamp
+        let(:read_at) { [] }
+        let(:serializer) do
+          times = read_at
+          Class.new do
+            define_singleton_method(:serialize) do |records, dependencies:|
+              times << Time.now.utc
+              { records: records.map { |record| { id: record.id } }, dependencies: dependencies }
+            end
+          end
+        end
+
+        before { config.include_serialized_at_in_payload = true }
+
+        it "never stamps later than the read it describes" do
+          call
+
+          expect(Time.parse(published_event.fetch("serialized_at"))).to be <= read_at.first
+        end
+      end
+
       context "when the stamp is enabled", :freeze_time do
         before { config.include_serialized_at_in_payload = true }
 
