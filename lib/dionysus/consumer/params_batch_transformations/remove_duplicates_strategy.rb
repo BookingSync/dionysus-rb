@@ -52,7 +52,7 @@ class Dionysus::Consumer::ParamsBatchTransformations::RemoveDuplicatesStrategy
     raw = message.payload.fetch("message").first["serialized_at"]
 
     raw ? Time.parse(raw.to_s) : FALLBACK_SERIALIZED_AT
-  rescue StandardError
+  rescue
     FALLBACK_SERIALIZED_AT
   end
 

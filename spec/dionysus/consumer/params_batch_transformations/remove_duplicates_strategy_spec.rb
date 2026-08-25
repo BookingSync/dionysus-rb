@@ -387,6 +387,7 @@ RSpec.describe Dionysus::Consumer::ParamsBatchTransformations::RemoveDuplicatesS
         expect(call.to_a).to eq([message_2])
       end
     end
+
     describe "when the message published last carries an OLDER serialized_at" do
       # reproduces booking 22611119, v3_bookings partition 3, offsets 28005577-28005579.
       # The offset the batch ends on was published at 11:36:46.905 but its payload was read at
@@ -479,6 +480,5 @@ RSpec.describe Dionysus::Consumer::ParamsBatchTransformations::RemoveDuplicatesS
         expect(call.to_a).to eq([message_2])
       end
     end
-
   end
 end
