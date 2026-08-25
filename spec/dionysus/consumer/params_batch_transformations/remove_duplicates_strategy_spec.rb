@@ -387,5 +387,98 @@ RSpec.describe Dionysus::Consumer::ParamsBatchTransformations::RemoveDuplicatesS
         expect(call.to_a).to eq([message_2])
       end
     end
+    describe "when the message published last carries an OLDER serialized_at" do
+      # reproduces booking 22611119, v3_bookings partition 3, offsets 28005577-28005579.
+      # The offset the batch ends on was published at 11:36:46.905 but its payload was read at
+      # 11:36:46.398194, before the payment existed. Ranking on offset picked it and paid_amount
+      # stuck at 0.00 in the projection while core said 1447.0.
+      let(:messages_array) { [message_1, message_2] }
+
+      let(:message_1) { double(:batch_1, payload: payload_1, offset: 28_005_577) }
+      let(:message_2) { double(:batch_2, payload: payload_2, offset: 28_005_579) }
+      let(:metadata) { double(:metadata) }
+
+      let(:payload_1) do
+        {
+          "message" => [
+            {
+              "event" => "booking_updated",
+              "model_name" => "Booking",
+              "serialized_at" => "2026-08-25T11:36:46.837000Z",
+              "data" => [
+                {
+                  "id" => 22_611_119,
+                  "paid_amount" => "1447.0",
+                  "updated_at" => "2026-08-25T11:36:46.671830Z"
+                }
+              ]
+            }
+          ]
+        }
+      end
+      let(:payload_2) do
+        {
+          "message" => [
+            {
+              "event" => "booking_updated",
+              "model_name" => "Booking",
+              "serialized_at" => "2026-08-25T11:36:46.405000Z",
+              "data" => [
+                {
+                  "id" => 22_611_119,
+                  "paid_amount" => "0.0",
+                  "updated_at" => "2026-08-25T11:36:46.398194Z"
+                }
+              ]
+            }
+          ]
+        }
+      end
+
+      it "keeps the freshest payload, not the one published last" do
+        expect(call.to_a).to eq([message_1])
+      end
+    end
+
+    describe "when only some messages carry serialized_at" do
+      let(:messages_array) { [message_1, message_2] }
+
+      let(:message_1) { double(:batch_1, payload: payload_1, offset: 10) }
+      let(:message_2) { double(:batch_2, payload: payload_2, offset: 9) }
+      let(:metadata) { double(:metadata) }
+
+      let(:payload_1) do
+        {
+          "message" => [
+            {
+              "event" => "booking_updated",
+              "model_name" => "Booking",
+              "data" => [
+                { "id" => 16, "paid_amount" => "0.0", "updated_at" => "2026-08-25T11:36:46.982700Z" }
+              ]
+            }
+          ]
+        }
+      end
+      let(:payload_2) do
+        {
+          "message" => [
+            {
+              "event" => "booking_updated",
+              "model_name" => "Booking",
+              "serialized_at" => "2026-08-25T11:36:47.100000Z",
+              "data" => [
+                { "id" => 16, "paid_amount" => "57.89", "updated_at" => "2026-08-25T11:36:46.953694Z" }
+              ]
+            }
+          ]
+        }
+      end
+
+      it "prefers the stamped message, which can only come from a newer producer" do
+        expect(call.to_a).to eq([message_2])
+      end
+    end
+
   end
 end

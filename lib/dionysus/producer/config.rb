@@ -8,7 +8,8 @@ class Dionysus::Producer::Config
     :lock_client, :lock_expiry_time, :error_handler, :outbox_publishing_batch_size,
     :transactional_outbox_enabled, :sidekiq_queue, :publisher_service_name,
     :genesis_consistency_safety_delay, :hermes_event_producer, :publish_after_commit, :outbox_worker_publishing_delay,
-    :high_priority_sidekiq_queue, :observers_inline_maximum_size, :remove_consecutive_duplicates_before_publishing
+    :high_priority_sidekiq_queue, :observers_inline_maximum_size, :remove_consecutive_duplicates_before_publishing,
+    :include_serialized_at_in_payload
 
   def self.default_sidekiq_queue
     :dionysus
@@ -94,6 +95,15 @@ class Dionysus::Producer::Config
 
   def observers_inline_maximum_size
     @observers_inline_maximum_size || 1000
+  end
+
+  # When enabled, every published event carries "serialized_at" - the moment its payload was
+  # actually read. Consumers rank duplicates on it. Off by default so consumers can be rolled out
+  # first: they fall back to the offset when the field is absent, which is the previous behaviour.
+  def include_serialized_at_in_payload
+    return @include_serialized_at_in_payload if defined?(@include_serialized_at_in_payload)
+
+    false
   end
 
   def remove_consecutive_duplicates_before_publishing
