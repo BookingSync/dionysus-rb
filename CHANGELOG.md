@@ -1,5 +1,14 @@
 ## [Unreleased]
 
+## [1.2.0]
+
+### Fixed
+
+- Rank duplicate messages in a consumer batch by when their payload was serialized, not by Kafka offset. The previous release ranked on the highest offset, on the premise that offsets strictly increase in publish order. They do - but publish order is not serialization order: `Publisher#publish` does `find_by` -> `generate_message` -> `responder.call`, so a message produced later can carry an earlier snapshot. Measured in production on one record, eight `updated` events inside 700 ms: the offset the batch ended on was published at `.905` carrying a payload read at `.398194` with `paid_amount 0.0`, while an earlier offset published at `.837` carried a payload read at `.671830` with the real value of `1447.0`. Ranking on offset kept the stale payload and the consumer's value stuck at `0.00` with nothing to self-heal it.
+- Neither field already in the message is a freshness signal. `updated_at` is the record's own timestamp and does not move when only an associated record changes, so two payloads with different computed values can share one `updated_at` - that is the tie the previous release was written for. The offset is publish order, per above. The two known incidents are mirror images: in one the correct message has the higher offset and the older `updated_at`, in the other the lower offset and the newer `updated_at`, so no ordering over the existing fields fixes both.
+- The producer therefore stamps `serialized_at` where the payload is actually built, and the consumer ranks on `[serialized_at, offset]`. Messages without the field fall back to `Time.at(0)` and are ordered among themselves by offset, which is exactly the previous behaviour; a stamped message wins over an unstamped one, which is correct because a stamp can only come from a newer producer.
+- The stamp is gated on `config.include_serialized_at_in_payload`, default `false`, so published envelopes are unchanged until it is switched on. Roll consumers out first - with the fallback that deploy is a no-op - then enable it on the producer.
+
 ## [1.1.0]
 
 ### Fixed
