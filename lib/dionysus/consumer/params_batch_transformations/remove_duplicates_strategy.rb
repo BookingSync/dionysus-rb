@@ -3,8 +3,7 @@
 require "time"
 
 class Dionysus::Consumer::ParamsBatchTransformations::RemoveDuplicatesStrategy
-  # messages produced before "serialized_at" existed sort below every stamped message
-  FALLBACK_SERIALIZED_AT = Time.at(0).utc.freeze
+  SERIALIZED_AT_FORMAT = %r{\A\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d+)?Z\z}
 
   def call(params_batch)
     return params_batch if duplicates_removal_not_applicable?(params_batch)
@@ -24,16 +23,28 @@ class Dionysus::Consumer::ParamsBatchTransformations::RemoveDuplicatesStrategy
     params_batch
       .to_a
       .group_by { |batch| grouping_key_by_event_and_id(batch) }
-      .map { |_, group| group.max_by { |message| [serialized_at_for(message), message.offset] } }
+      .map { |_, group| freshest(group) }
       .flatten
+  end
+
+  # a group is ranked by its stamps only when every message in it carries one - during the
+  # producer rollout a batch can hold both, and a stamp says nothing about an unstamped neighbour
+  def freshest(group)
+    stamps = group.map { |message| serialized_at_for(message) }
+
+    return group.max_by(&:offset) if stamps.any?(&:nil?)
+
+    group.zip(stamps).max_by { |message, serialized_at| [serialized_at, message.offset] }.first
   end
 
   def serialized_at_for(message)
     raw = message.payload.fetch("message").first["serialized_at"]
 
-    raw ? Time.parse(raw.to_s) : FALLBACK_SERIALIZED_AT
+    return unless raw.is_a?(String) && raw.match?(SERIALIZED_AT_FORMAT)
+
+    Time.parse(raw)
   rescue
-    FALLBACK_SERIALIZED_AT
+    nil
   end
 
   def grouping_key_by_event_and_id(batch)

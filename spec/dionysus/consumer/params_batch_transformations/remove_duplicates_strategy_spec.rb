@@ -438,7 +438,7 @@ RSpec.describe Dionysus::Consumer::ParamsBatchTransformations::RemoveDuplicatesS
       end
     end
 
-    describe "when only some messages carry serialized_at" do
+    describe "when only some messages in a group carry serialized_at" do
       let(:messages_array) { [message_1, message_2] }
 
       let(:message_1) { double(:batch_1, payload: payload_1, offset: 10) }
@@ -451,9 +451,7 @@ RSpec.describe Dionysus::Consumer::ParamsBatchTransformations::RemoveDuplicatesS
             {
               "event" => "booking_updated",
               "model_name" => "Booking",
-              "data" => [
-                { "id" => 16, "paid_amount" => "0.0", "updated_at" => "2026-08-25T11:36:46.982700Z" }
-              ]
+              "data" => [{ "id" => 16, "paid_amount" => "57.89" }]
             }
           ]
         }
@@ -464,17 +462,77 @@ RSpec.describe Dionysus::Consumer::ParamsBatchTransformations::RemoveDuplicatesS
             {
               "event" => "booking_updated",
               "model_name" => "Booking",
-              "serialized_at" => "2026-08-25T11:36:47.100000Z",
-              "data" => [
-                { "id" => 16, "paid_amount" => "57.89", "updated_at" => "2026-08-25T11:36:46.953694Z" }
-              ]
+              "serialized_at" => "2026-08-25T11:36:46.100000Z",
+              "data" => [{ "id" => 16, "paid_amount" => "0.0" }]
             }
           ]
         }
       end
 
-      it "prefers the stamped message, which can only come from a newer producer" do
-        expect(call.to_a).to eq([message_2])
+      it "falls back to the offset, because a stamp says nothing about an unstamped neighbour" do
+        expect(call.to_a).to eq([message_1])
+      end
+    end
+
+    describe "when a serialized_at is not a UTC ISO 8601 string" do
+      let(:messages_array) { [message_1, message_2] }
+
+      let(:message_1) { double(:batch_1, payload: payload_1, offset: 10) }
+      let(:message_2) { double(:batch_2, payload: payload_2, offset: 9) }
+      let(:metadata) { double(:metadata) }
+      let(:unusable_stamp) { "1787053006" }
+
+      let(:payload_1) do
+        {
+          "message" => [
+            {
+              "event" => "booking_updated",
+              "model_name" => "Booking",
+              "serialized_at" => unusable_stamp,
+              "data" => [{ "id" => 16, "paid_amount" => "57.89" }]
+            }
+          ]
+        }
+      end
+      let(:payload_2) do
+        {
+          "message" => [
+            {
+              "event" => "booking_updated",
+              "model_name" => "Booking",
+              "serialized_at" => "2026-08-25T11:36:46.100000Z",
+              "data" => [{ "id" => 16, "paid_amount" => "0.0" }]
+            }
+          ]
+        }
+      end
+
+      it "falls back to the offset rather than ranking on a stamp it cannot trust" do
+        expect(call.to_a).to eq([message_1])
+      end
+
+      context "when it carries no zone designator" do
+        let(:unusable_stamp) { "2026-08-25T11:36:46.671830" }
+
+        it "falls back to the offset rather than reading it as local time" do
+          expect(call.to_a).to eq([message_1])
+        end
+      end
+
+      context "when it is not a time at all" do
+        let(:unusable_stamp) { "not-a-time" }
+
+        it "falls back to the offset" do
+          expect(call.to_a).to eq([message_1])
+        end
+      end
+
+      context "when it is null" do
+        let(:unusable_stamp) { nil }
+
+        it "falls back to the offset" do
+          expect(call.to_a).to eq([message_1])
+        end
       end
     end
   end
