@@ -1407,5 +1407,38 @@ RSpec.describe Dionysus::Producer::KarafkaResponderGenerator do
         end
       end
     end
+
+    describe "stamping serialized_at" do
+      subject(:call) { responder.call([event], partition_key: "Smily", key: "#WhateverItTakes") }
+
+      let(:responder) { generate.new }
+      let(:genesis_replica) { false }
+      let(:event) { ["rental_created", [rental_1]] }
+      let(:published_event) do
+        JSON.parse(responder.messages_buffer.fetch("v8_rentals").first.first).fetch("message").first
+      end
+
+      context "when the stamp is disabled" do
+        it "leaves the published envelope untouched" do
+          call
+
+          expect(published_event).not_to have_key("serialized_at")
+        end
+      end
+
+      context "when the stamp is enabled", :freeze_time do
+        before { config.include_serialized_at_in_payload = true }
+
+        it "records when the payload was serialized, to microseconds" do
+          call
+
+          aggregate_failures do
+            expect(published_event.fetch("serialized_at")).to eq Time.now.utc.iso8601(6)
+            expect(published_event.fetch("event")).to eq "rental_created"
+            expect(published_event.fetch("data")).to be_present
+          end
+        end
+      end
+    end
   end
 end

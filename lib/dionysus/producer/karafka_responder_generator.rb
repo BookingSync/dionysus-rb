@@ -46,11 +46,8 @@ class Dionysus::Producer::KarafkaResponderGenerator
 
               record = records.sample
 
-              # Stamp when this payload was read. Payloads carry values computed on read from
-              # associated records, so "which payload is freshest" is decided here, not by the
-              # record's updated_at (which does not move when only an association changes) and
-              # not by the Kafka offset (which is publish order - a message produced later can
-              # carry an earlier snapshot). Consumers rank duplicates on this.
+              # the offset alone is publish order, and a message published later can carry an
+              # earlier snapshot, so consumers need to know when this payload was actually read
               serialized_at = config.include_serialized_at_in_payload ? Time.now.utc : nil
               payload = serialize_to_payload(records, topic, batch_options)
 

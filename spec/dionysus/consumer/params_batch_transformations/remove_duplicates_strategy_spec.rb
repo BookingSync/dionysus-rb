@@ -389,10 +389,7 @@ RSpec.describe Dionysus::Consumer::ParamsBatchTransformations::RemoveDuplicatesS
     end
 
     describe "when the message published last carries an OLDER serialized_at" do
-      # reproduces booking 22611119, v3_bookings partition 3, offsets 28005577-28005579.
-      # The offset the batch ends on was published at 11:36:46.905 but its payload was read at
-      # 11:36:46.398194, before the payment existed. Ranking on offset picked it and paid_amount
-      # stuck at 0.00 in the projection while core said 1447.0.
+      # reproduces booking 22611119, v3_bookings partition 3, offsets 28005577-28005579
       let(:messages_array) { [message_1, message_2] }
 
       let(:message_1) { double(:batch_1, payload: payload_1, offset: 28_005_577) }

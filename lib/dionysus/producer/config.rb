@@ -97,9 +97,8 @@ class Dionysus::Producer::Config
     @observers_inline_maximum_size || 1000
   end
 
-  # When enabled, every published event carries "serialized_at" - the moment its payload was
-  # actually read. Consumers rank duplicates on it. Off by default so consumers can be rolled out
-  # first: they fall back to the offset when the field is absent, which is the previous behaviour.
+  # Off by default so consumers, which fall back to the offset when the field is absent, can be
+  # rolled out first.
   def include_serialized_at_in_payload
     return @include_serialized_at_in_payload if defined?(@include_serialized_at_in_payload)
 
