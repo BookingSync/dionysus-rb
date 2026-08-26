@@ -1,6 +1,7 @@
 # frozen_string_literal: true
 
 require "active_support/core_ext/string"
+require "time"
 
 class Dionysus::Producer::KarafkaResponderGenerator
   TOMBSTONE = nil
@@ -45,13 +46,18 @@ class Dionysus::Producer::KarafkaResponderGenerator
 
               record = records.sample
 
+              # the offset alone is publish order, and a message published later can carry an
+              # earlier snapshot, so consumers need to know when this payload was actually read
+              serialized_at = config.include_serialized_at_in_payload ? Time.now.utc : nil
               payload = serialize_to_payload(records, topic, batch_options)
 
-              {
+              event_payload = {
                 event: event,
                 model_name: record.model_name.name,
                 data: payload
               }
+              event_payload[:serialized_at] = serialized_at.iso8601(6) if serialized_at
+              event_payload
             end
             unless genesis_only?(options)
               respond_to topic_name, { message: message }, **final_options
