@@ -224,7 +224,7 @@ end
 class BookingForKarafkaConsumerTest < BaseModelClassForKarafkaConsumerTest
   include ModelAttributesForKarafkaConsumerTest
 
-  attr_accessor :synced_id, :start_at
+  attr_accessor :synced_id, :start_at, :paid_amount
 
   def model_name
     "Booking"

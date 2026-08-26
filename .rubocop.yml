@@ -170,6 +170,7 @@ Naming/AccessorMethodName:
 RSpec/DescribeClass:
   Exclude:
     - 'spec/integration_spec.rb'
+    - 'spec/dedup_serialization_time_integration_spec.rb'
 
 Style/MultilineBlockChain:
   Exclude:
