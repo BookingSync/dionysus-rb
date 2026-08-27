@@ -9,7 +9,7 @@ class Dionysus::Producer::Config
     :transactional_outbox_enabled, :sidekiq_queue, :publisher_service_name,
     :genesis_consistency_safety_delay, :hermes_event_producer, :publish_after_commit, :outbox_worker_publishing_delay,
     :high_priority_sidekiq_queue, :observers_inline_maximum_size, :remove_consecutive_duplicates_before_publishing,
-    :include_serialized_at_in_payload, :publish_with_uncached_reads
+    :include_serialized_at_in_payload, :publish_with_uncached_reads, :publish_consistent_snapshots
 
   def self.default_sidekiq_queue
     :dionysus
@@ -101,6 +101,15 @@ class Dionysus::Producer::Config
   # if the extra reads ever cost more than they are worth.
   def publish_with_uncached_reads
     return @publish_with_uncached_reads if defined?(@publish_with_uncached_reads)
+
+    false
+  end
+
+  # Re-serialize when a record moved while its payload was being built, so the payload describes a
+  # single moment. Off by default; the extra read costs one indexed column per message, and the
+  # re-serialization only happens on the records that were actually contended.
+  def publish_consistent_snapshots
+    return @publish_consistent_snapshots if defined?(@publish_consistent_snapshots)
 
     false
   end
