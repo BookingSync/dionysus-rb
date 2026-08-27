@@ -9,7 +9,7 @@ class Dionysus::Producer::Config
     :transactional_outbox_enabled, :sidekiq_queue, :publisher_service_name,
     :genesis_consistency_safety_delay, :hermes_event_producer, :publish_after_commit, :outbox_worker_publishing_delay,
     :high_priority_sidekiq_queue, :observers_inline_maximum_size, :remove_consecutive_duplicates_before_publishing,
-    :include_serialized_at_in_payload
+    :include_serialized_at_in_payload, :publish_with_uncached_reads
 
   def self.default_sidekiq_queue
     :dionysus
@@ -95,6 +95,14 @@ class Dionysus::Producer::Config
 
   def observers_inline_maximum_size
     @observers_inline_maximum_size || 1000
+  end
+
+  # Off by default so it can be switched on per producer, and switched back off in one env change
+  # if the extra reads ever cost more than they are worth.
+  def publish_with_uncached_reads
+    return @publish_with_uncached_reads if defined?(@publish_with_uncached_reads)
+
+    false
   end
 
   # Off by default so consumers, which fall back to the offset when the field is absent, can be
