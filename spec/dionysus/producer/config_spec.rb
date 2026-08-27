@@ -380,4 +380,26 @@ RSpec.describe Dionysus::Producer::Config do
       it { is_expected.to be true }
     end
   end
+
+  describe "#publish_with_uncached_reads/publish_with_uncached_reads=" do
+    subject(:publish_with_uncached_reads) { config.publish_with_uncached_reads }
+
+    let(:config) { described_class.new }
+
+    context "when publish_with_uncached_reads is not specified" do
+      it { is_expected.to be false }
+    end
+
+    context "when publish_with_uncached_reads is disabled" do
+      before { config.publish_with_uncached_reads = false }
+
+      it { is_expected.to be false }
+    end
+
+    context "when publish_with_uncached_reads is enabled" do
+      before { config.publish_with_uncached_reads = true }
+
+      it { is_expected.to be true }
+    end
+  end
 end

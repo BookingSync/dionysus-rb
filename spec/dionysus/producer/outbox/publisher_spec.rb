@@ -1009,4 +1009,66 @@ RSpec.describe Dionysus::Producer::Outbox::Publisher do
       end
     end
   end
+
+  describe "reading the record and its associations for the payload" do
+    subject(:publish) { described_class.new(config: producer_config).publish(outbox_record) }
+
+    # Publishing runs inside the request when publish_after_commit is on, so Rails' query cache is
+    # live on that connection and a row read earlier in the request is served from it while the
+    # associations are queried fresh. The payload then carries an updated_at older than its own
+    # data, and every consumer discards it on the staleness guard.
+    around { |example| ActiveRecord::Base.cache { example.run } }
+
+    before do
+      resource
+      # exactly the query the publisher issues, so the cache entry is the one it would hit
+      ExampleResource.find_by(ExampleResource.primary_key => outbox_record.resource_id)
+    end
+
+    def select_events_for_example_resources
+      events = []
+      subscription = ActiveSupport::Notifications.subscribe("sql.active_record") do |*, payload|
+        events << payload
+      end
+      yield
+      events.select do |payload|
+        sql = payload[:sql].to_s
+        sql.start_with?("SELECT") && sql.include?("example_resources")
+      end
+    ensure
+      ActiveSupport::Notifications.unsubscribe(subscription)
+    end
+
+    context "when publish_with_uncached_reads is disabled" do
+      it "serves the record from the query cache, which is how a stale payload is built" do
+        reads = select_events_for_example_resources { publish }
+
+        expect(reads).not_to be_empty
+        expect(reads).to all(satisfy { |payload| payload[:cached] })
+      end
+    end
+
+    context "when publish_with_uncached_reads is enabled" do
+      before do
+        Dionysus::Producer.configure do |conf|
+          conf.publish_with_uncached_reads = true
+        end
+      end
+
+      it "re-reads the record rather than trusting the cached row" do
+        reads = select_events_for_example_resources { publish }
+
+        expect(reads).not_to be_empty
+        expect(reads).to all(satisfy { |payload| !payload[:cached] })
+      end
+
+      it "still publishes the message" do
+        allow(Karafka.producer).to receive(:produce_sync).and_call_original
+
+        publish
+
+        expect(Karafka.producer).to have_received(:produce_sync).at_least(:once)
+      end
+    end
+  end
 end

@@ -1,5 +1,15 @@
 ## [Unreleased]
 
+## [1.3.0]
+
+### Fixed
+
+- Read the record and its associations without the query cache while publishing, behind `config.publish_with_uncached_reads` (default `false`). The payload is built from the record plus the associations declared with `with:`. When `publish_after_commit` is on, publishing runs inside the request, where Rails' query cache is live on that connection - so a row read earlier in the request is served from the cache while its associations are queried fresh. The payload then carries an `updated_at` older than the data it contains.
+- Measured in production on the sibling gem over a two and a half hour window on one topic: of 1,476 records that received more than one message, 141 had a payload whose `updated_at` moved backwards as `serialized_at` moved forwards, and in 69 of those the message that wins deduplication carried an `updated_at` lower than one already published at a lower offset. One record published a payload serialized at `09:27:23.662` reporting `updated_at 09:27:22.139557`, when a payload serialized 1.3 seconds earlier had already reported `09:27:22.345092` - a value a row's `updated_at` cannot return to.
+- The consequence is not a stale field but a discarded record. Consumers rank duplicates and then apply `persist_with_dionysus?`, which compares the payload's `updated_at` against what is stored; a payload that loses that comparison is skipped by `next`, and the `has_many` records embedded in it are persisted further down the same loop body, so they are dropped with it. The parent keeps its old values and the new child rows are never created, with no error, no counter and nothing to self-heal it.
+- This is why no ordering over the fields already in the message could fix both known incidents: `updated_at` was in the message all along and is simply wrong. `serialized_at`, added in 1.2.0, correctly identifies the last-serialized message - which is precisely the one the guard rejects when its `updated_at` is stale.
+- Rolling this out needs no consumer changes: the fix is entirely on the producer, and the payload's shape is unchanged.
+
 ## [1.2.0]
 
 ### Fixed

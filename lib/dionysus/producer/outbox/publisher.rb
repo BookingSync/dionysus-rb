@@ -11,58 +11,74 @@ class Dionysus::Producer::Outbox::Publisher
   def publish(outbox_record, options = {})
     return if Dionysus::Producer::Suppressor.suppressed?
 
-    instrument("publishing_with_dionysus") do
-      resource_class = outbox_record.resource_class.constantize
-      primary_key = resource_class.primary_key
-      primary_key_value = outbox_record.resource_id
-      topic = outbox_record.topic
-      resource = resource_class.find_by(primary_key => primary_key_value) ||
-        resource_class.new(primary_key => primary_key_value)
-      event_name = outbox_record.event_name
-      if resource.new_record? && outbox_record.created_event?
-        logger.error(
-          "Attempted to publish #{resource.class}, id: #{resource.id} but it was deleted, that should never happen!"
-        )
-        return
-      end
+    with_consistent_reads do
+      instrument("publishing_with_dionysus") do
+        resource_class = outbox_record.resource_class.constantize
+        primary_key = resource_class.primary_key
+        primary_key_value = outbox_record.resource_id
+        topic = outbox_record.topic
+        resource = resource_class.find_by(primary_key => primary_key_value) ||
+          resource_class.new(primary_key => primary_key_value)
+        event_name = outbox_record.event_name
+        if resource.new_record? && outbox_record.created_event?
+          logger.error(
+            "Attempted to publish #{resource.class}, id: #{resource.id} but it was deleted, that should never happen!"
+          )
+          return
+        end
 
-      if resource.new_record? && outbox_record.updated_event?
-        logger.error(
-          "There was an update of #{resource.class}, id: #{resource.id} but it was deleted, that should never happen!"
-        )
-        return
-      end
+        if resource.new_record? && outbox_record.updated_event?
+          logger.error(
+            "There was an update of #{resource.class}, id: #{resource.id} but it was deleted, that should never happen!"
+          )
+          return
+        end
 
-      published_count = publish_for_top_level_resource(outbox_record, resource, event_name, topic, options) +
-        publish_for_dependency(resource, topic, options)
-      handle_nothing_published(resource, event_name, topic) if published_count.zero?
-      published_count
+        published_count = publish_for_top_level_resource(outbox_record, resource, event_name, topic, options) +
+          publish_for_dependency(resource, topic, options)
+        handle_nothing_published(resource, event_name, topic) if published_count.zero?
+        published_count
+      end
     end
   end
 
   def publish_observers(outbox_record)
     return if Dionysus::Producer::Suppressor.suppressed?
 
-    instrument("publishing_observers_with_dionysus") do
-      resource_class = outbox_record.resource_class.constantize
-      primary_key = resource_class.primary_key
-      primary_key_value = outbox_record.resource_id
-      resource = resource_class.find_by(primary_key => primary_key_value) ||
-        resource_class.new(primary_key => primary_key_value)
-      changeset = outbox_record.transformed_changeset
+    with_consistent_reads do
+      instrument("publishing_observers_with_dionysus") do
+        resource_class = outbox_record.resource_class.constantize
+        primary_key = resource_class.primary_key
+        primary_key_value = outbox_record.resource_id
+        resource = resource_class.find_by(primary_key => primary_key_value) ||
+          resource_class.new(primary_key => primary_key_value)
+        changeset = outbox_record.transformed_changeset
 
-      Dionysus::Producer.observers_with_responders_for(resource,
-        changeset).each do |observers, responder|
-        if observers.count > config.observers_inline_maximum_size
-          execute_genesis_for_observers(observers, responder)
-        else
-          observers.each { |observer_record| publish_observer(observer_record, responder) }
+        Dionysus::Producer.observers_with_responders_for(resource,
+          changeset).each do |observers, responder|
+          if observers.count > config.observers_inline_maximum_size
+            execute_genesis_for_observers(observers, responder)
+          else
+            observers.each { |observer_record| publish_observer(observer_record, responder) }
+          end
         end
       end
     end
   end
 
   private
+
+  # The payload is built from the record and its associations. Publishing runs inside the request
+  # when publish_after_commit is on, where Rails' query cache is live on that connection, so a row
+  # read earlier in the request can be served from the cache while its associations are queried
+  # fresh - producing a payload whose updated_at is older than the data it carries. Consumers rank
+  # and guard on updated_at, so such a payload is silently discarded, taking its embedded
+  # associations with it.
+  def with_consistent_reads(&)
+    return yield unless config.publish_with_uncached_reads
+
+    ActiveRecord::Base.uncached(&)
+  end
 
   delegate :instrumenter, :error_handler, to: :config
   delegate :instrument, to: :instrumenter
