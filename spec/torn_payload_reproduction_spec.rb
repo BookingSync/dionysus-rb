@@ -47,10 +47,15 @@ RSpec.describe "Reproduction: a payload whose updated_at predates its own associ
     end
   end
 
+  let(:increments) { [] }
+  let(:serializations) { [0] }
+
   before do
     hook = write_during_serialization
+    tally = serializations
     serializer = Class.new do
       define_singleton_method(:serialize) do |records, **|
+        tally[0] += 1
         records.map do |record|
           updated_at = record.updated_at            # the row timestamp, read FIRST
           hook.call                                 # a write arrives mid-serialization
@@ -63,8 +68,14 @@ RSpec.describe "Reproduction: a payload whose updated_at predates its own associ
       end
     end
 
+    recorded = increments
+    recording_instrumenter = Class.new do
+      define_singleton_method(:instrument) { |_name, _payload = {}, &block| block.call }
+      define_singleton_method(:increment) { |name, options = {}| recorded << [name, options.fetch(:tags, [])] }
+    end
+
     Dionysus::Producer.configure do |conf|
-      conf.instrumenter = Dionysus::Utils::NullInstrumenter
+      conf.instrumenter = recording_instrumenter
       conf.outbox_model = DionysusOutbox
       conf.default_partition_key = :id
       conf.transaction_provider = ActiveRecord::Base
@@ -112,6 +123,10 @@ RSpec.describe "Reproduction: a payload whose updated_at predates its own associ
     Karafka::App.setup { |config| config.producer = original_producer }
   end
 
+  def snapshot_tags
+    increments.filter_map { |name, tags| tags if name == "dionysus.publish.consistent_snapshot" }
+  end
+
   def published_event
     Karafka::Admin.read_topic(topic_name, 0, 10).map { |m| m.payload.fetch("message").first }.last
   end
@@ -132,6 +147,9 @@ RSpec.describe "Reproduction: a payload whose updated_at predates its own associ
 
       # the payload embeds BOTH children while reporting a timestamp from before the second existed
       expect(children).to eq 2
+      # with the guard off nothing is emitted, so an empty series means "not running" and can never
+      # be mistaken for "running clean"
+      expect(snapshot_tags).to be_empty
       # an order of magnitude below the window held open above, so this reads as "adrift", not as
       # the millisecond the payload's own timestamp precision could account for on its own
       expect(row_updated_at - payload_updated_at).to be > 0.01
@@ -150,6 +168,8 @@ RSpec.describe "Reproduction: a payload whose updated_at predates its own associ
       # the second serialization sees the write that arrived during the first one, and the payload's
       # timestamp now matches the row the data came from
       expect(children).to eq 2
+      expect(serializations.first).to eq 2
+      expect(snapshot_tags.last).to include("result:consistent", "attempts:2")
       # equal to the precision the payload is serialized at; the control above is a full window adrift
       expect((row_updated_at - payload_updated_at).abs).to be < 0.002
     end
@@ -160,6 +180,26 @@ RSpec.describe "Reproduction: a payload whose updated_at predates its own associ
       it "publishes the last attempt rather than looping" do
         expect { publish_and_read }.not_to raise_error
         expect(published_event.fetch("data").first).to include("updated_at")
+      end
+
+      it "counts the attempt it gave up on, the only trace that payload may still be torn" do
+        publish_and_read
+
+        expect(serializations.first).to eq 3
+        expect(snapshot_tags.last).to include("result:exhausted", "attempts:3")
+      end
+
+      context "when max_snapshot_attempts is lowered" do
+        before do
+          Dionysus::Producer.configure { |conf| conf.max_snapshot_attempts = 2 }
+        end
+
+        it "stops re-serializing at the configured ceiling" do
+          publish_and_read
+
+          expect(serializations.first).to eq 2
+          expect(snapshot_tags.last).to include("result:exhausted", "attempts:2")
+        end
       end
     end
   end

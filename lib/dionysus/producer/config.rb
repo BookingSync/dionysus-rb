@@ -9,7 +9,8 @@ class Dionysus::Producer::Config
     :transactional_outbox_enabled, :sidekiq_queue, :publisher_service_name,
     :genesis_consistency_safety_delay, :hermes_event_producer, :publish_after_commit, :outbox_worker_publishing_delay,
     :high_priority_sidekiq_queue, :observers_inline_maximum_size, :remove_consecutive_duplicates_before_publishing,
-    :include_serialized_at_in_payload, :publish_with_uncached_reads, :publish_consistent_snapshots
+    :include_serialized_at_in_payload, :publish_with_uncached_reads, :publish_consistent_snapshots,
+    :max_snapshot_attempts
 
   def self.default_sidekiq_queue
     :dionysus
@@ -99,6 +100,15 @@ class Dionysus::Producer::Config
 
   # Off by default so it can be switched on per producer, and switched back off in one env change
   # if the extra reads ever cost more than they are worth.
+  # How many times a payload may be re-serialized before the last attempt is published as it stands.
+  # This is the expensive half of publish_consistent_snapshots: a record written faster than it
+  # serializes fails the check on every attempt, so it pays the full serialization cost this many
+  # times over and still publishes a payload that may be torn. Lower it to bound that cost; 1
+  # disables re-serialization while leaving the check (and its metric) in place.
+  def max_snapshot_attempts
+    @max_snapshot_attempts || Dionysus::Producer::MAX_SNAPSHOT_ATTEMPTS
+  end
+
   def publish_with_uncached_reads
     return @publish_with_uncached_reads if defined?(@publish_with_uncached_reads)
 

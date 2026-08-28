@@ -91,16 +91,36 @@ class Dionysus::Producer::KarafkaResponderGenerator
       define_method :serialize_consistently do |records, current_topic, batch_options|
         next serialize_to_payload(records, current_topic, batch_options) unless config.publish_consistent_snapshots
 
+        max_attempts = config.max_snapshot_attempts
         attempts = 0
         loop do
           before = snapshot_of(records)
           payload = serialize_to_payload(records, current_topic, batch_options)
           attempts += 1
-          break payload if before.nil? || before == committed_snapshot_of(records)
-          break payload if attempts >= Dionysus::Producer::MAX_SNAPSHOT_ATTEMPTS
+
+          # nothing to compare against, so the guard did not run on this message at all
+          break instrument_snapshot("unsupported", attempts, records, current_topic, payload) if before.nil?
+          if before == committed_snapshot_of(records)
+            break instrument_snapshot("consistent", attempts, records, current_topic, payload)
+          end
+          if attempts >= max_attempts
+            # published anyway: a payload that may be torn beats no message. Nothing downstream can
+            # tell this apart from a clean one - the payload carries no marker and the consumer sees
+            # an ordinary message - so this counter is the only place the outcome is ever visible.
+            break instrument_snapshot("exhausted", attempts, records, current_topic, payload)
+          end
 
           records.each { |record| record.reload if record.is_a?(ActiveRecord::Base) && record.persisted? }
         end
+      end
+
+      # One counter rather than several: the denominator, the retry distribution and the failure
+      # rate all have to come from the same series or none of them can be read as a rate.
+      define_method :instrument_snapshot do |result, attempts, records, current_topic, payload|
+        config.instrumenter.increment("dionysus.publish.consistent_snapshot",
+          tags: ["result:#{result}", "attempts:#{attempts}", "topic:#{current_topic}",
+            "model:#{records.first.class}"])
+        payload
       end
 
       # nil means there is nothing to compare - a record without timestamps, or not a record at all

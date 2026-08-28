@@ -101,6 +101,49 @@ RSpec.describe Dionysus::Producer::KarafkaResponderGenerator do
     end
 
     describe "publishing" do
+      describe "consistent snapshot instrumentation" do
+        subject(:call) { responder.call([event_1, event_2], partition_key: "Smily", key: "#WhateverItTakes") }
+
+        let(:responder) { generate.new }
+        let(:event_1) { ["rental_created", [rental_1, rental_2]] }
+        let(:event_2) { ["tax_created", [tax]] }
+        let(:increments) { [] }
+
+        before do
+          recorded = increments
+          config.instrumenter = Class.new do
+            define_singleton_method(:instrument) { |_name, _payload = {}, &block| block.call }
+            define_singleton_method(:increment) { |name, options = {}| recorded << [name, options.fetch(:tags, [])] }
+          end
+        end
+
+        def snapshot_tags
+          increments.filter_map { |name, tags| tags if name == "dionysus.publish.consistent_snapshot" }
+        end
+
+        context "when publish_consistent_snapshots is disabled" do
+          before { config.publish_consistent_snapshots = false }
+
+          it "emits nothing, so the metric's absence means the guard is off rather than passing" do
+            call
+
+            expect(snapshot_tags).to be_empty
+          end
+        end
+
+        context "when publish_consistent_snapshots is enabled" do
+          before { config.publish_consistent_snapshots = true }
+
+          it "reports one result per event, tagged unsupported for records carrying no updated_at" do
+            call
+
+            expect(snapshot_tags.size).to eq 2
+            expect(snapshot_tags.first).to include("result:unsupported", "attempts:1", "topic:v8_rentals")
+            expect(snapshot_tags.last).to include("result:unsupported", "attempts:1", "topic:v8_rentals")
+          end
+        end
+      end
+
       describe "responding to Kafka" do
         let(:responder_klass) { generate }
         let(:responder) { responder_klass.new }
