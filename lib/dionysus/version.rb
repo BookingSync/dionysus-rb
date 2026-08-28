@@ -3,5 +3,5 @@
 module Dionysus
   module Version
   end
-  VERSION = "1.4.0"
+  VERSION = "1.4.1"
 end

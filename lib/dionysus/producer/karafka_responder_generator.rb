@@ -46,10 +46,10 @@ class Dionysus::Producer::KarafkaResponderGenerator
 
               record = records.sample
 
-              # the offset alone is publish order, and a message published later can carry an
-              # earlier snapshot, so consumers need to know when this payload was actually read
-              serialized_at = config.include_serialized_at_in_payload ? Time.now.utc : nil
-              payload = serialize_consistently(records, topic, batch_options)
+              # consumers rank duplicates by this stamp, so it has to describe the attempt actually
+              # published - with retries that is the last one, not the first
+              payload, read_at = serialize_consistently(records, topic, batch_options)
+              serialized_at = config.include_serialized_at_in_payload ? read_at : nil
 
               event_payload = {
                 event: event,
@@ -88,26 +88,33 @@ class Dionysus::Producer::KarafkaResponderGenerator
       # So serialize, then check whether the records moved underneath it. If they did, the payload
       # is not a snapshot of anything: reload and serialize again. Retries are bounded, and the last
       # attempt is published rather than dropped - a payload that may be torn still beats no message.
+      # returns [payload, read_at] - read_at is when the attempt that produced this payload began
       define_method :serialize_consistently do |records, current_topic, batch_options|
-        next serialize_to_payload(records, current_topic, batch_options) unless config.publish_consistent_snapshots
+        unless config.publish_consistent_snapshots
+          read_at = Time.now.utc
+          next [serialize_to_payload(records, current_topic, batch_options), read_at]
+        end
 
         max_attempts = config.max_snapshot_attempts
         attempts = 0
         loop do
+          read_at = Time.now.utc
           before = snapshot_of(records)
           payload = serialize_to_payload(records, current_topic, batch_options)
           attempts += 1
 
-          # nothing to compare against, so the guard did not run on this message at all
-          break instrument_snapshot("unsupported", attempts, records, current_topic, payload) if before.nil?
+          if before.nil?
+            # nothing to compare against, so the guard did not run on this message at all
+            break [instrument_snapshot("unsupported", attempts, records, current_topic, payload), read_at]
+          end
           if before == committed_snapshot_of(records)
-            break instrument_snapshot("consistent", attempts, records, current_topic, payload)
+            break [instrument_snapshot("consistent", attempts, records, current_topic, payload), read_at]
           end
           if attempts >= max_attempts
             # published anyway: a payload that may be torn beats no message. Nothing downstream can
             # tell this apart from a clean one - the payload carries no marker and the consumer sees
             # an ordinary message - so this counter is the only place the outcome is ever visible.
-            break instrument_snapshot("exhausted", attempts, records, current_topic, payload)
+            break [instrument_snapshot("exhausted", attempts, records, current_topic, payload), read_at]
           end
 
           records.each { |record| record.reload if record.is_a?(ActiveRecord::Base) && record.persisted? }

@@ -1,5 +1,11 @@
 ## [Unreleased]
 
+## [1.4.1]
+- Stamp `serialized_at` when the attempt that is actually published begins, not before the retry loop. 1.4.0 takes the stamp once and then re-serializes up to `max_snapshot_attempts` times, so a message can be published a whole retry cycle after its own stamp - and the payload it publishes is the one read last, not the one the stamp describes. Consumers rank duplicates by `[serialized_at, offset]`, so the freshest payload ended up carrying the oldest stamp and losing its group to a staler sibling. That is the failure `serialized_at` was added to prevent, reintroduced by the guard added to prevent a different one.
+- Measured on the affected topic over 65 minutes: 205 of 6,572 messages (3.12%) carried an `updated_at` LATER than their own `serialized_at`, the worst by 1,225 ms. A timestamp cannot describe a moment after the one it was taken at, so that alone proves the stamp preceded the payload.
+- `serialize_consistently` now returns `[payload, read_at]`. The looseness between stamp and payload is bounded by a single serialization pass again, as it was before 1.4.0, rather than by the whole retry cycle - so contended records, which retry most, are no longer the ones stamped most wrongly.
+- Covered end to end against a real broker in `spec/serialized_at_tracks_published_attempt_spec.rb`: a contended publish retries while a competing publish serializes once and stamps later, both are read back off the topic, and the real `RemoveDuplicatesStrategy` is asked which survives. The spec fails on 1.4.0 on both assertions.
+
 ## [1.4.0]
 
 ### Fixed
