@@ -1,6 +1,11 @@
 # frozen_string_literal: true
 
 class Dionysus::Producer
+  # a contended record can move again while it is being re-serialized; bound the work and publish
+  # the last attempt rather than looping or dropping the message. Overridable per producer through
+  # config.max_snapshot_attempts - this is only the default.
+  MAX_SNAPSHOT_ATTEMPTS = 3
+
   def self.configuration
     @configuration ||= Dionysus::Producer::Config.new
   end

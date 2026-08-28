@@ -359,6 +359,45 @@ RSpec.describe Dionysus::Producer::Config do
     end
   end
 
+  describe "#publish_consistent_snapshots/publish_consistent_snapshots=" do
+    subject(:publish_consistent_snapshots) { config.publish_consistent_snapshots }
+
+    let(:config) { described_class.new }
+
+    context "when publish_consistent_snapshots is not specified" do
+      it { is_expected.to be false }
+    end
+
+    context "when publish_consistent_snapshots is disabled" do
+      before { config.publish_consistent_snapshots = false }
+
+      it { is_expected.to be false }
+    end
+
+    context "when publish_consistent_snapshots is enabled" do
+      before { config.publish_consistent_snapshots = true }
+
+      it { is_expected.to be true }
+    end
+  end
+
+  describe "#max_snapshot_attempts/max_snapshot_attempts=" do
+    subject(:max_snapshot_attempts) { config.max_snapshot_attempts }
+
+    let(:config) { described_class.new }
+
+    context "when max_snapshot_attempts is not specified" do
+      it { is_expected.to eq Dionysus::Producer::MAX_SNAPSHOT_ATTEMPTS }
+      it { is_expected.to eq 3 }
+    end
+
+    context "when max_snapshot_attempts is specified" do
+      before { config.max_snapshot_attempts = 2 }
+
+      it { is_expected.to eq 2 }
+    end
+  end
+
   describe "#remove_consecutive_duplicates_before_publishing/remove_consecutive_duplicates_before_publishing=" do
     subject(:remove_consecutive_duplicates_before_publishing) { config.remove_consecutive_duplicates_before_publishing }
 

@@ -337,9 +337,23 @@ Dionysus::Producer.configure do |config|
   config.outbox_worker_publishing_delay = 5 # non required, defaults to 0 a delay in seconds until the outbox record is considered publishable. Check `Publishing records right after the transaction is committed` section for more details.
   config.remove_consecutive_duplicates_before_publishing = true # not required, defaults to false. If set to true, the consecutive duplicates in the publishable batch will be removed and only one message will be published to a given topic. For example, if for whatever reason there are ten messages in a row for a given topic to publish `user_updated` ecent, only the last will be published. Check `Dionysus::Consumer::ParamsBatchTransformations::RemoveDuplicatesStrategy` for exact implementation. To verify if this feature is useful, it's recommended to browse Karafka UI and check messages in the topics if there are any obvious duplicates happening often.
   config.observers_inline_maximum_size = 100 # not required, defaults to 1000. This config setting matters in case there is a huge amount of dependent records (observers). If the threshold is exceeded, the observers will be published via Genesis process to not cause issues like blocking the outbox worker.
+  config.publish_consistent_snapshots = true # not required, defaults to `false`. A serializer reads a record's own columns and then queries its associations, so a write landing in between produces a payload whose `updated_at` predates the records embedded next to it - consumers rank and guard on that timestamp, so such a payload is discarded along with its embedded associations. When enabled, the row's timestamp is read back (bypassing the query cache) after serializing and the payload is re-serialized if the record moved. Emits the `dionysus.publish.consistent_snapshot` counter described below.
+  config.max_snapshot_attempts = 2 # not required, defaults to 3. Only relevant with `publish_consistent_snapshots` enabled. A record written faster than it serializes fails the check on every attempt, so it pays the full serialization cost this many times over and still publishes a payload that may be torn - lower this to bound that cost. Set it to 1 to keep the check and its metric while disabling re-serialization entirely.
   config.sidekiq_queue = :default # required, defaults to :dionysus. The queue will be used for a genesis process
 end
 ```
+
+##### Monitoring consistent snapshots
+
+With `publish_consistent_snapshots` enabled, every guarded message increments `dionysus.publish.consistent_snapshot` exactly once, tagged with `result`, `attempts`, `topic` and `model`. Nothing is emitted when the feature is off, so an empty series means the guard is not running rather than running clean.
+
+| `result` | meaning |
+|---|---|
+| `consistent` | the record had not moved by the time the payload was built. With `attempts:1` the first try was already clean; higher values mean it converged after re-serializing. |
+| `exhausted` | the record was still moving at `max_snapshot_attempts`. The payload is published anyway - a payload that may be torn beats no message - but it carries no marker and consumers see an ordinary message, so this counter is the only place the outcome is visible. |
+| `unsupported` | the records carry no `updated_at`, so the guard could not run on that message at all. |
+
+Watch the `exhausted` rate before and after a rollout: the retry cost scales with write rate multiplied by serialization span, so the hottest records are both the most expensive to guard and the least likely to converge.
 
 ##### DionysusOutbox model
 
