@@ -24,12 +24,20 @@ RSpec.describe "Reproduction: a payload whose updated_at predates its own associ
   # fires during the FIRST serialization only, which is what transient contention looks like: a
   # request commits while a payload is being built, and is gone by the time it is built again
   let(:writes_remaining) { 1 }
+  # How long the payload is under construction while the write lands. Production serialization spans
+  # 95ms at the median, so hold the window open explicitly instead of letting it be whatever a thread
+  # takes to check out a connection on the box running this - that incidental cost measured 37ms
+  # locally and 5ms on CI, which turns the assertion below into a race against the hardware rather
+  # than a statement about the payload.
+  let(:serialization_window) { 0.05 }
   let(:write_during_serialization) do
     remaining = writes_remaining
+    window = serialization_window
     lambda do
       next if remaining <= 0
 
       remaining -= 1
+      sleep window
       Thread.new do
         ActiveRecord::Base.connection_pool.with_connection do
           ExampleResource.create!(account_id: 7, example_publishable_cancelable_resource_id: parent.id)
@@ -124,6 +132,8 @@ RSpec.describe "Reproduction: a payload whose updated_at predates its own associ
 
       # the payload embeds BOTH children while reporting a timestamp from before the second existed
       expect(children).to eq 2
+      # an order of magnitude below the window held open above, so this reads as "adrift", not as
+      # the millisecond the payload's own timestamp precision could account for on its own
       expect(row_updated_at - payload_updated_at).to be > 0.01
     end
   end
@@ -140,7 +150,7 @@ RSpec.describe "Reproduction: a payload whose updated_at predates its own associ
       # the second serialization sees the write that arrived during the first one, and the payload's
       # timestamp now matches the row the data came from
       expect(children).to eq 2
-      # equal to the precision the payload is serialized at; the control above is 27-54ms adrift
+      # equal to the precision the payload is serialized at; the control above is a full window adrift
       expect((row_updated_at - payload_updated_at).abs).to be < 0.002
     end
 
