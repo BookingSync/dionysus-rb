@@ -336,6 +336,8 @@ Dionysus::Producer.configure do |config|
   config.publish_after_commit = true # not required, defaults to `false`. Check `Publishing records right after the transaction is committed` section for more details.
   config.outbox_worker_publishing_delay = 5 # non required, defaults to 0 a delay in seconds until the outbox record is considered publishable. Check `Publishing records right after the transaction is committed` section for more details.
   config.remove_consecutive_duplicates_before_publishing = true # not required, defaults to false. If set to true, the consecutive duplicates in the publishable batch will be removed and only one message will be published to a given topic. For example, if for whatever reason there are ten messages in a row for a given topic to publish `user_updated` ecent, only the last will be published. Check `Dionysus::Consumer::ParamsBatchTransformations::RemoveDuplicatesStrategy` for exact implementation. To verify if this feature is useful, it's recommended to browse Karafka UI and check messages in the topics if there are any obvious duplicates happening often.
+  config.republish_deduplicated_records = true # not required, defaults to false. Only has an effect with `remove_consecutive_duplicates_before_publishing` enabled. When a run of consecutive duplicates collapses, the surviving record is scheduled to publish once more after a delay - a run only collapses when the record was written again while an earlier message for it was still queued, which is the window in which a payload can be serialized across a write. Check `Republishing deduplicated records` section for more details.
+  config.republish_deduplicated_records_delay = 60 # not required, defaults to 30 (seconds). Only relevant with `republish_deduplicated_records` enabled. How long the scheduled republish waits - it has to outlast the burst of writes that produced the duplicates, or the republish is serialized inside the same contended window it exists to escape.
   config.observers_inline_maximum_size = 100 # not required, defaults to 1000. This config setting matters in case there is a huge amount of dependent records (observers). If the threshold is exceeded, the observers will be published via Genesis process to not cause issues like blocking the outbox worker.
   config.publish_consistent_snapshots = true # not required, defaults to `false`. A serializer reads a record's own columns and then queries its associations, so a write landing in between produces a payload whose `updated_at` predates the records embedded next to it - consumers rank and guard on that timestamp, so such a payload is discarded along with its embedded associations. When enabled, the row's timestamp is read back (bypassing the query cache) after serializing and the payload is re-serialized if the record moved. Emits the `dionysus.publish.consistent_snapshot` counter described below.
   config.max_snapshot_attempts = 2 # not required, defaults to 3. Only relevant with `publish_consistent_snapshots` enabled. A record written faster than it serializes fails the check on every attempt, so it pays the full serialization cost this many times over and still publishes a payload that may be torn - lower this to bound that cost. Set it to 1 to keep the check and its metric while disabling re-serialization entirely.
@@ -354,6 +356,28 @@ With `publish_consistent_snapshots` enabled, every guarded message increments `d
 | `unsupported` | the records carry no `updated_at`, so the guard could not run on that message at all. |
 
 Watch the `exhausted` rate before and after a rollout: the retry cost scales with write rate multiplied by serialization span, so the hottest records are both the most expensive to guard and the least likely to converge.
+
+##### Republishing deduplicated records
+
+`remove_consecutive_duplicates_before_publishing` keeps only the last record of each consecutive run for the same resource, event and topic. A run longer than one only happens when the record was written again while an earlier message for it was still queued - the same window in which a payload can be serialized across a write and end up carrying an `updated_at` older than its own contents. `publish_consistent_snapshots` bounds its retries and publishes the last attempt regardless, so a payload that may still be torn does get published.
+
+With `republish_deduplicated_records` enabled, the survivor of every collapsed run is scheduled to publish once more, `republish_deduplicated_records_delay` seconds later:
+
+```ruby
+config.remove_consecutive_duplicates_before_publishing = true
+config.republish_deduplicated_records = true
+config.republish_deduplicated_records_delay = 30
+```
+
+This needs no change on the consumer side. The outbox stores a pointer rather than a payload - `Outbox::Publisher#publish` re-reads the row with `find_by` - so the scheduled record is serialized fresh when it comes due and carries the settled state. The consumer's guard is `event_updated_at >= synced_at`, and `synced_at` is the consumer's mirror of the row's `updated_at` as of the last accepted message, a value the row's own `updated_at` can never fall below. A freshly-read republish is therefore accepted rather than discarded as stale, so nothing has to be forced past the guard and no timestamp has to be altered to make it win.
+
+The republish is scheduled with `retry_at`, not a future `created_at`. `fetch_publishable` honours `retry_at` exactly, whereas `created_at` is compared against `Time.current + outbox_worker_publishing_delay` - a future `created_at` would publish early by the length of that look-ahead window, and would report a negative `publishing_latency`. `failed_at` and `error_class` stay `nil`, so a scheduled republish stays distinguishable from a record awaiting an error retry.
+
+A scheduled record that comes due on its own is a run of one, so it schedules nothing further. If the record is still being written when it comes due it collapses again and schedules once more, which is the intent; the extra load is bounded at one additional record per key per batch, and pile-ups for the same key collapse through the same filter.
+
+Observer records are skipped - they carry a changeset that decides which observers fire, and they publish through `publish_observers`. Records that failed to publish are skipped too, since `handle_error`'s backoff already retries them.
+
+Before enabling this, check any alert threshold on outbox latency. The scheduled records sit unpublished for the delay, so they raise the average and maximum reported by the `"#{namespace}.dionysus.producer.outbox.latency.*"` gauges. That is a truthful measurement - those messages really do wait - but it will move the gauge.
 
 ##### DionysusOutbox model
 
