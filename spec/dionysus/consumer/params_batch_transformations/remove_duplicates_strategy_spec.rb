@@ -535,5 +535,160 @@ RSpec.describe Dionysus::Consumer::ParamsBatchTransformations::RemoveDuplicatesS
         end
       end
     end
+
+    describe "when the message serialized last carries an updated_at the consumer's guard will reject" do
+      # reproduces booking 22636772, v3_bookings partition 4, offsets 55101943-55101945
+      let(:messages_array) { [message_1, message_2, message_3] }
+
+      let(:message_1) { double(:batch_1, payload: payload_1, offset: 55_101_943) }
+      let(:message_2) { double(:batch_2, payload: payload_2, offset: 55_101_944) }
+      let(:message_3) { double(:batch_3, payload: payload_3, offset: 55_101_945) }
+      let(:metadata) { double(:metadata) }
+
+      let(:payload_1) do
+        {
+          "message" => [
+            {
+              "event" => "booking_updated",
+              "model_name" => "Booking",
+              "serialized_at" => "2026-08-31T13:12:57.097939Z",
+              "data" => [
+                {
+                  "id" => 22_636_772,
+                  "paid_amount" => "127.0",
+                  "updated_at" => "2026-08-31T13:12:56.975713Z"
+                }
+              ]
+            }
+          ]
+        }
+      end
+      let(:payload_2) do
+        {
+          "message" => [
+            {
+              "event" => "booking_updated",
+              "model_name" => "Booking",
+              "serialized_at" => "2026-08-31T13:12:57.340585Z",
+              "data" => [
+                {
+                  "id" => 22_636_772,
+                  "paid_amount" => "127.0",
+                  "updated_at" => "2026-08-31T13:12:56.975713Z"
+                }
+              ]
+            }
+          ]
+        }
+      end
+      let(:payload_3) do
+        {
+          "message" => [
+            {
+              "event" => "booking_updated",
+              "model_name" => "Booking",
+              "serialized_at" => "2026-08-31T13:12:57.593432Z",
+              "data" => [
+                {
+                  "id" => 22_636_772,
+                  "paid_amount" => "127.0",
+                  "updated_at" => "2026-08-31T13:12:56.598805Z"
+                }
+              ]
+            }
+          ]
+        }
+      end
+
+      it "keeps a message the guard will accept, not the one serialized last" do
+        expect(call.to_a).to eq([message_2])
+      end
+    end
+
+    describe "when the group's updated_at values tie" do
+      let(:messages_array) { [message_1, message_2] }
+
+      let(:message_1) { double(:batch_1, payload: payload_1, offset: 1) }
+      let(:message_2) { double(:batch_2, payload: payload_2, offset: 2) }
+      let(:metadata) { double(:metadata) }
+
+      let(:payload_1) do
+        {
+          "message" => [
+            {
+              "event" => "booking_updated",
+              "model_name" => "Booking",
+              "serialized_at" => "2026-08-31T10:00:00.200000Z",
+              "data" => [
+                {
+                  "id" => 16,
+                  "paid_amount" => "10.0",
+                  "updated_at" => "2026-08-31T10:00:00.000000Z"
+                }
+              ]
+            }
+          ]
+        }
+      end
+      let(:payload_2) do
+        {
+          "message" => [
+            {
+              "event" => "booking_updated",
+              "model_name" => "Booking",
+              "serialized_at" => "2026-08-31T10:00:00.100000Z",
+              "data" => [
+                {
+                  "id" => 16,
+                  "paid_amount" => "0.0",
+                  "updated_at" => "2026-08-31T10:00:00.000000Z"
+                }
+              ]
+            }
+          ]
+        }
+      end
+
+      it "breaks the tie on the stamp, which is what 2.4.0 was written for" do
+        expect(call.to_a).to eq([message_1])
+      end
+    end
+
+    describe "when a payload in the group carries no updated_at" do
+      let(:messages_array) { [message_1, message_2] }
+
+      let(:message_1) { double(:batch_1, payload: payload_1, offset: 1) }
+      let(:message_2) { double(:batch_2, payload: payload_2, offset: 2) }
+      let(:metadata) { double(:metadata) }
+
+      let(:payload_1) do
+        {
+          "message" => [
+            {
+              "event" => "los_record_updated",
+              "model_name" => "LosRecord",
+              "serialized_at" => "2026-08-31T10:00:00.900000Z",
+              "data" => [{ "id" => 16, "rate" => "10.0" }]
+            }
+          ]
+        }
+      end
+      let(:payload_2) do
+        {
+          "message" => [
+            {
+              "event" => "los_record_updated",
+              "model_name" => "LosRecord",
+              "serialized_at" => "2026-08-31T10:00:00.100000Z",
+              "data" => [{ "id" => 16, "rate" => "20.0" }]
+            }
+          ]
+        }
+      end
+
+      it "falls back to the stamp, since there is nothing else to rank on" do
+        expect(call.to_a).to eq([message_1])
+      end
+    end
   end
 end

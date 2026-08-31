@@ -27,18 +27,43 @@ class Dionysus::Consumer::ParamsBatchTransformations::RemoveDuplicatesStrategy
       .flatten
   end
 
-  # a group is ranked by its stamps only when every message in it carries one - during the
-  # producer rollout a batch can hold both, and a stamp says nothing about an unstamped neighbour
+  # ranked on updated_at first: it is the field the consumer's own guard compares, so the group
+  # maximum is accepted whenever any sibling would be. Stamps break its ties, offsets break theirs.
   def freshest(group)
     stamps = group.map { |message| serialized_at_for(message) }
 
     return group.max_by(&:offset) if stamps.any?(&:nil?)
 
+    timestamps = group.map { |message| updated_at_for(message) }
+
+    return freshest_by_stamp(group, stamps) if timestamps.any?(&:nil?)
+
+    freshest_by_timestamp(group, timestamps, stamps)
+  end
+
+  def freshest_by_stamp(group, stamps)
     group.zip(stamps).max_by { |message, serialized_at| [serialized_at, message.offset] }.first
+  end
+
+  def freshest_by_timestamp(group, timestamps, stamps)
+    group
+      .zip(timestamps, stamps)
+      .max_by { |message, updated_at, serialized_at| [updated_at, serialized_at, message.offset] }
+      .first
   end
 
   def serialized_at_for(message)
     raw = message.payload.fetch("message").first["serialized_at"]
+
+    return unless raw.is_a?(String) && raw.match?(SERIALIZED_AT_FORMAT)
+
+    Time.parse(raw)
+  rescue
+    nil
+  end
+
+  def updated_at_for(message)
+    raw = message.payload.fetch("message").first.dig("data", 0, "updated_at")
 
     return unless raw.is_a?(String) && raw.match?(SERIALIZED_AT_FORMAT)
 
