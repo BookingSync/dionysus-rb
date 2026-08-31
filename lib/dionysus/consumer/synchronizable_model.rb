@@ -25,6 +25,13 @@ class Dionysus::Consumer::SynchronizableModel < SimpleDelegator
     (synced_at && event_updated_at && event_updated_at >= synced_at) || synced_at.nil? || event_updated_at.nil?
   end
 
+  # A purge stamps the cancel column without bumping synced_updated_at, so under a stale payload a tie
+  # on the child's timestamp is how a cancelled child gets revived. Demand demonstrably newer.
+  def advances_dionysus_state?(event_updated_at)
+    persist_with_dionysus?(event_updated_at) &&
+      !(synced_at && event_updated_at && event_updated_at == synced_at)
+  end
+
   def assign_attributes_from_dionysus(attributes)
     public_send("#{synced_data_attribute}=", attributes)
     reverse_mapping = config.attributes_mapping_for_model(model.model_name).to_a.to_h(&:reverse)
