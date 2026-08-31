@@ -401,4 +401,133 @@ RSpec.describe Dionysus::Producer::Outbox::RecordsProcessor do
       end
     end
   end
+
+  describe "#call scheduling a republish for deduplicated records", :freeze_time do
+    subject(:call) { described_class.new.call(records_to_publish) }
+
+    # no live resource: the publisher is stubbed, so nothing loads it, and creating one would fire
+    # the publishing callbacks another example in this file has already declared topics for
+    let(:resource_id) { "1" }
+    let(:other_resource_id) { "2" }
+    let(:event_name) { "example_resource_updated" }
+    let(:topic) { "v102_rentals" }
+    let(:delay) { 30 }
+    let(:scheduled) { DionysusOutbox.where(published_at: nil).where.not(retry_at: nil) }
+
+    def outbox_record_for(id, on_topic: topic)
+      DionysusOutbox.create!(resource_class: "ExampleResource", resource_id: id, event_name:,
+        topic: on_topic, partition_key: "2", created_at: Time.current)
+    end
+
+    before do
+      Dionysus::Producer.configure do |conf|
+        conf.outbox_model = DionysusOutbox
+        conf.transaction_provider = ActiveRecord::Base
+        conf.remove_consecutive_duplicates_before_publishing = true
+        conf.republish_deduplicated_records = true
+        conf.republish_deduplicated_records_delay = delay
+      end
+      allow(Dionysus::Producer).to receive(:outbox_publisher)
+        .and_return(instance_double(Dionysus::Producer::Outbox::Publisher,
+          publish: 1, publish_observers: 1))
+      DionysusOutbox.delete_all
+    end
+
+    after do
+      Dionysus::Producer.configure do |conf|
+        conf.republish_deduplicated_records = false
+        conf.republish_deduplicated_records_delay = 30
+      end
+    end
+
+    context "when a run of consecutive duplicates collapsed" do
+      let!(:first) { outbox_record_for(resource_id) }
+      let!(:second) { outbox_record_for(resource_id) }
+      let(:records_to_publish) { [first, second] }
+
+      it "schedules exactly one republish, addressed at the same resource, event and topic" do
+        expect { call }.to change { scheduled.count }.from(0).to(1)
+
+        expect(scheduled.first).to have_attributes(resource_class: "ExampleResource", resource_id:,
+          event_name:, topic:, partition_key: "2")
+      end
+
+      it "schedules it with retry_at rather than a future created_at, so publishing_latency stays honest" do
+        call
+
+        expect(scheduled.first).to have_attributes(retry_at: 30.seconds.from_now, created_at: Time.current)
+      end
+
+      it "leaves the republish distinguishable from a record awaiting an error retry" do
+        call
+
+        expect(scheduled.first).to have_attributes(failed_at: nil, error_class: nil, error_message: nil,
+          attempts: 0)
+      end
+
+      context "when a delay is configured" do
+        let(:delay) { 90 }
+
+        it "honours it" do
+          call
+
+          expect(scheduled.first.retry_at).to eq(90.seconds.from_now)
+        end
+      end
+
+      context "when the feature is off" do
+        before { Dionysus::Producer.configure { |c| c.republish_deduplicated_records = false } }
+
+        it { is_expected_block.not_to change { scheduled.count } }
+      end
+
+      context "when duplicates are not being removed in the first place" do
+        before do
+          Dionysus::Producer.configure do |conf|
+            conf.remove_consecutive_duplicates_before_publishing = false
+          end
+        end
+
+        it { is_expected_block.not_to change { scheduled.count } }
+      end
+
+      context "when publishing the survivor failed" do
+        before do
+          allow(Dionysus::Producer.outbox_publisher).to receive(:publish)
+            .and_raise(StandardError, "boom")
+        end
+
+        it "schedules nothing, because handle_error already retries that record" do
+          expect { call }.not_to change { scheduled.where(error_class: nil).count }
+        end
+      end
+    end
+
+    context "when nothing collapsed" do
+      let!(:first) { outbox_record_for(resource_id) }
+      let!(:second) { outbox_record_for(other_resource_id) }
+      let(:records_to_publish) { [first, second] }
+
+      it { is_expected_block.not_to change { scheduled.count } }
+    end
+
+    context "when the duplicated records are observers" do
+      let!(:first) { outbox_record_for(resource_id, on_topic: "__outbox_observer__") }
+      let!(:second) { outbox_record_for(resource_id, on_topic: "__outbox_observer__") }
+      let(:records_to_publish) { [first, second] }
+
+      it "skips them, since they carry a changeset and publish through a different path" do
+        expect { call }.not_to change { scheduled.count }
+      end
+    end
+
+    context "when a scheduled republish later comes due on its own" do
+      let!(:republish) { outbox_record_for(resource_id) }
+      let(:records_to_publish) { [republish] }
+
+      it "is a run of one, so it does not schedule anything further" do
+        expect { call }.not_to change { scheduled.count }
+      end
+    end
+  end
 end

@@ -420,6 +420,44 @@ RSpec.describe Dionysus::Producer::Config do
     end
   end
 
+  describe "#republish_deduplicated_records/republish_deduplicated_records=" do
+    subject(:republish_deduplicated_records) { config.republish_deduplicated_records }
+
+    let(:config) { described_class.new }
+
+    context "when republish_deduplicated_records is not specified" do
+      it { is_expected.to be false }
+    end
+
+    context "when republish_deduplicated_records is disabled" do
+      before { config.republish_deduplicated_records = false }
+
+      it { is_expected.to be false }
+    end
+
+    context "when republish_deduplicated_records is enabled" do
+      before { config.republish_deduplicated_records = true }
+
+      it { is_expected.to be true }
+    end
+  end
+
+  describe "#republish_deduplicated_records_delay/republish_deduplicated_records_delay=" do
+    subject(:republish_deduplicated_records_delay) { config.republish_deduplicated_records_delay }
+
+    let(:config) { described_class.new }
+
+    context "when republish_deduplicated_records_delay is not specified" do
+      it { is_expected.to eq 30.seconds }
+    end
+
+    context "when republish_deduplicated_records_delay is specified" do
+      before { config.republish_deduplicated_records_delay = 45 }
+
+      it { is_expected.to eq 45.seconds }
+    end
+  end
+
   describe "#publish_with_uncached_reads/publish_with_uncached_reads=" do
     subject(:publish_with_uncached_reads) { config.publish_with_uncached_reads }
 

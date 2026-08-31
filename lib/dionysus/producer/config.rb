@@ -10,7 +10,7 @@ class Dionysus::Producer::Config
     :genesis_consistency_safety_delay, :hermes_event_producer, :publish_after_commit, :outbox_worker_publishing_delay,
     :high_priority_sidekiq_queue, :observers_inline_maximum_size, :remove_consecutive_duplicates_before_publishing,
     :include_serialized_at_in_payload, :publish_with_uncached_reads, :publish_consistent_snapshots,
-    :max_snapshot_attempts
+    :max_snapshot_attempts, :republish_deduplicated_records, :republish_deduplicated_records_delay
 
   def self.default_sidekiq_queue
     :dionysus
@@ -136,5 +136,20 @@ class Dionysus::Producer::Config
     return @remove_consecutive_duplicates_before_publishing if defined?(@remove_consecutive_duplicates_before_publishing)
 
     false
+  end
+
+  # Publish the survivor of a collapsed run of duplicates once more, after a delay, so a payload
+  # that may have been serialized across a write is followed by one read after the writes settled.
+  # Off by default; does nothing unless remove_consecutive_duplicates_before_publishing is also on.
+  def republish_deduplicated_records
+    return @republish_deduplicated_records if defined?(@republish_deduplicated_records)
+
+    false
+  end
+
+  # Has to outlast the burst of writes that produced the duplicates, or the republish is serialized
+  # inside the same contended window it exists to escape.
+  def republish_deduplicated_records_delay
+    (@republish_deduplicated_records_delay || 30).to_d.seconds
   end
 end
