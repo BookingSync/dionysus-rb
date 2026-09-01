@@ -68,9 +68,20 @@ module EmbeddedChildrenPersistenceTest
     include ModelAttributesForKarafkaConsumerTest
 
     attr_accessor :synced_canceled_at, :synced_booking_id, :amount
+    attr_reader :to_many_resolutions
+
+    def initialize(attributes = {})
+      @to_many_resolutions = []
+      super
+    end
 
     def model_name
       "BookingsPayment"
+    end
+
+    # only exercised by the depth-2 example; payments carry no to_many links anywhere else here
+    def resolve_to_many_association(relation_name, synced_ids)
+      to_many_resolutions << [relation_name, synced_ids]
     end
   end
 
@@ -266,6 +277,97 @@ RSpec.describe "Money the consumer discarded along with the parent payload" do #
 
         expect(EmbeddedChildrenPersistenceTest::DB.payments.map(&:synced_canceled_at)).to eq([nil])
       end
+    end
+  end
+
+  # A payload the guard has already rejected proves nothing about a child it carries no timestamp for.
+  # Where resolve_to_many hard-deletes - eight consuming applications do - applying one would bring a
+  # child back that a fresher payload had already removed. Refusing it is what the old blanket next did.
+  describe "A child the rejected payload carries no timestamp for" do
+    let(:booking_id) { 5 }
+    let(:payment_id) { 55 }
+    let(:projection_synced_at) { Time.parse("2026-08-31T13:20:00.000000Z") }
+    let(:unstamped_payment) do
+      { "id" => payment_id, "canceled_at" => nil, "amount" => "500.0", "links" => { "booking" => booking_id } }
+    end
+    let(:batch) do
+      build_batch(
+        [
+          build_message(
+            booking_payload(
+              booking_id:, updated_at: "2026-08-31T13:19:59.000000Z", paid_amount: "500.0",
+              serialized_at: "2026-08-31T13:20:10.000000Z", embedded: { payments: [unstamped_payment] }
+            ),
+            1, booking_id
+          )
+        ]
+      )
+    end
+
+    before do
+      # the payment is not held locally at all: a fresher payload's purge hard-deleted it
+      EmbeddedChildrenPersistenceTest::DB.bookings << EmbeddedChildrenPersistenceTest::Booking.new(
+        synced_id: booking_id, synced_updated_at: projection_synced_at, paid_amount: "0.0"
+      )
+    end
+
+    it "does not bring it back from the dead" do
+      consume
+
+      expect(EmbeddedChildrenPersistenceTest::DB.payments.select(&:saved)).to be_empty
+    end
+  end
+
+  # Staleness is sticky down the whole subtree, so a child that is itself fresh advances while its own
+  # children keep the generation they had. Master left the child at its old value instead - consistent,
+  # but also wrong. This records the trade rather than leaving it to be discovered.
+  describe "A fresh child of a stale root, carrying children of its own" do
+    let(:booking_id) { 6 }
+    let(:payment_id) { 66 }
+    let(:projection_synced_at) { Time.parse("2026-08-31T13:20:00.000000Z") }
+    let(:child_payload) do
+      {
+        "id" => payment_id, "created_at" => "2026-08-31T13:20:00.000000Z",
+        "updated_at" => "2026-08-31T13:25:00.000000Z", "canceled_at" => nil, "amount" => "500.0",
+        "links" => { "booking" => booking_id, "clients" => [] }, "clients" => []
+      }
+    end
+    let(:batch) do
+      build_batch(
+        [
+          build_message(
+            booking_payload(
+              booking_id:, updated_at: "2026-08-31T13:19:59.000000Z", paid_amount: "500.0",
+              serialized_at: "2026-08-31T13:25:10.000000Z", embedded: { payments: [child_payload] }
+            ),
+            1, booking_id
+          )
+        ]
+      )
+    end
+
+    before do
+      EmbeddedChildrenPersistenceTest::DB.bookings << EmbeddedChildrenPersistenceTest::Booking.new(
+        synced_id: booking_id, synced_updated_at: projection_synced_at, paid_amount: "0.0"
+      )
+      EmbeddedChildrenPersistenceTest::DB.payments << EmbeddedChildrenPersistenceTest::BookingsPayment.new(
+        synced_id: payment_id, synced_booking_id: booking_id,
+        synced_updated_at: Time.parse("2026-08-31T13:20:00.000000Z"), amount: "0.0"
+      )
+    end
+
+    it "advances the child on its own timestamp" do
+      consume
+
+      expect(EmbeddedChildrenPersistenceTest::DB.payments.first.amount).to eq("500.0")
+    end
+
+    it "leaves the child's own children on their previous generation" do
+      pending "accepted trade: the purge needs a list only a non-stale ancestor can vouch for; " \
+              "a later payload that passes the root guard repairs it"
+      consume
+
+      expect(EmbeddedChildrenPersistenceTest::DB.payments.first.to_many_resolutions).not_to be_empty
     end
   end
 
