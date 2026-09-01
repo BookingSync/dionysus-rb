@@ -341,7 +341,7 @@ RSpec.describe Dionysus::Consumer::ParamsBatchTransformations::RemoveDuplicatesS
     end
 
     describe "when the last published message carries an older updated_at" do
-      # reproduces booking 22578292, partition 6, offsets 17288919-17288920
+      # reproduces a torn payload observed in production: the correct payload carried the LOWER updated_at
       let(:messages_array) { [message_1, message_2] }
 
       let(:message_1) { double(:batch_1, payload: payload_1, offset: 1) }
