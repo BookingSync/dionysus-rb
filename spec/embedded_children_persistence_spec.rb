@@ -25,10 +25,20 @@ module EmbeddedChildrenPersistenceTest
         @clients ||= []
       end
 
+      def fees
+        @fees ||= []
+      end
+
+      def taxes
+        @taxes ||= []
+      end
+
       def reset!
         @bookings = []
         @payments = []
         @clients = []
+        @fees = []
+        @taxes = []
       end
     end
   end
@@ -107,11 +117,33 @@ module EmbeddedChildrenPersistenceTest
     end
   end
 
+  class BookingsFee < BaseModelClassForKarafkaConsumerTest
+    include ModelAttributesForKarafkaConsumerTest
+
+    attr_accessor :synced_canceled_at, :synced_booking_id, :price
+
+    def model_name
+      "BookingsFee"
+    end
+  end
+
+  class BookingsTax < BaseModelClassForKarafkaConsumerTest
+    include ModelAttributesForKarafkaConsumerTest
+
+    attr_accessor :synced_canceled_at, :synced_booking_id, :price
+
+    def model_name
+      "BookingsTax"
+    end
+  end
+
   class ModelFactory
     def for_model(model_name)
       case model_name.to_s.singularize.classify
       when "Booking" then Repository.new(Booking, DB.bookings)
       when "BookingsPayment" then Repository.new(BookingsPayment, DB.payments)
+      when "BookingsFee" then Repository.new(BookingsFee, DB.fees)
+      when "BookingsTax" then Repository.new(BookingsTax, DB.taxes)
       when "Client" then Repository.new(Client, DB.clients)
       end
     end
@@ -368,6 +400,89 @@ RSpec.describe "Money the consumer discarded along with the parent payload" do #
       consume
 
       expect(EmbeddedChildrenPersistenceTest::DB.payments.first.to_many_resolutions).not_to be_empty
+    end
+  end
+
+  # A real booking is published `with: [BookingsFee, BookingsTax, BookingsPayment, Payment]`, so one
+  # payload carries several kinds of child at once. Each has to be judged on its own timestamp, and the
+  # purge has to stay suppressed for EVERY relationship - not just the one that happens to carry money.
+  describe "A rejected parent carrying several kinds of embedded child" do
+    let(:booking_id) { 9 }
+    let(:payment_id) { 91 }
+    let(:fee_id) { 92 }
+    let(:tax_id) { 93 }
+    let(:projection_synced_at) { Time.parse("2026-08-31T13:20:00.000000Z") }
+    let(:held_at) { "2026-08-31T13:19:00.000000Z" }
+    let(:batch) do
+      record = {
+        "id" => booking_id,
+        "created_at" => "2026-08-31T09:00:00.000000Z",
+        "updated_at" => "2026-08-31T13:19:59.000000Z", # stale: older than what the projection holds
+        "canceled_at" => nil,
+        "paid_amount" => "500.0",
+        "links" => {
+          "bookings_payments" => [payment_id], "bookings_fees" => [fee_id], "bookings_taxes" => [tax_id]
+        },
+        # never seen locally -> must be created
+        "bookings_payments" => [{ "id" => payment_id, "created_at" => held_at,
+                                  "updated_at" => "2026-08-31T13:19:30.000000Z", "canceled_at" => nil,
+                                  "amount" => "500.0", "links" => { "booking" => booking_id } }],
+        # older than the row held locally -> must be skipped on its OWN timestamp
+        "bookings_fees" => [{ "id" => fee_id, "created_at" => held_at,
+                              "updated_at" => "2026-08-31T13:18:00.000000Z", "canceled_at" => nil,
+                              "price" => "99.0", "links" => { "booking" => booking_id } }],
+        # strictly newer than the row held locally -> must be applied
+        "bookings_taxes" => [{ "id" => tax_id, "created_at" => held_at,
+                               "updated_at" => "2026-08-31T13:21:00.000000Z", "canceled_at" => nil,
+                               "price" => "12.0", "links" => { "booking" => booking_id } }]
+      }
+      event = { "event" => "booking_updated", "model_name" => "Booking", "data" => [record],
+                "serialized_at" => "2026-08-31T13:21:10.000000Z" }
+      build_batch([build_message({ "message" => [event] }, 1, booking_id)])
+    end
+
+    before do
+      EmbeddedChildrenPersistenceTest::DB.bookings << EmbeddedChildrenPersistenceTest::Booking.new(
+        synced_id: booking_id, synced_updated_at: projection_synced_at, paid_amount: "0.0"
+      )
+      EmbeddedChildrenPersistenceTest::DB.fees << EmbeddedChildrenPersistenceTest::BookingsFee.new(
+        synced_id: fee_id, synced_booking_id: booking_id,
+        synced_updated_at: Time.parse(held_at), price: "77.0"
+      )
+      EmbeddedChildrenPersistenceTest::DB.taxes << EmbeddedChildrenPersistenceTest::BookingsTax.new(
+        synced_id: tax_id, synced_booking_id: booking_id,
+        synced_updated_at: Time.parse(held_at), price: "5.0"
+      )
+    end
+
+    it "creates the child it has never seen" do
+      consume
+
+      expect(EmbeddedChildrenPersistenceTest::DB.payments.select(&:saved).map(&:synced_id)).to eq([payment_id])
+    end
+
+    it "skips the child that is older than the row held locally" do
+      consume
+
+      expect(EmbeddedChildrenPersistenceTest::DB.fees.map(&:price)).to eq(["77.0"])
+    end
+
+    it "applies the child that is demonstrably newer" do
+      consume
+
+      expect(EmbeddedChildrenPersistenceTest::DB.taxes.map(&:price)).to eq(["12.0"])
+    end
+
+    it "purges nothing, on any of the three relationships" do
+      consume
+
+      expect(stored_booking(booking_id).to_many_resolutions).to be_empty
+    end
+
+    it "still does not write the parent's own columns" do
+      consume
+
+      expect(stored_booking(booking_id).paid_amount).to eq("0.0")
     end
   end
 
