@@ -2,15 +2,15 @@
 
 require "spec_helper"
 
-# Reproduces the two money losses reconciled on v3_bookings on 2026-08-31, at the level a fix has to
-# work at: a whole batch through the generated consumer, deduplication included, with the payment
-# embedded in the booking payload as a has_many - which is what takes the children down with the parent.
+# Reproduces two money losses observed in production, at the level a fix has to work at: a whole batch
+# through the generated consumer, deduplication included, with the payment embedded in the booking
+# payload as a has_many - which is what takes the children down with the parent.
 #
-# Case A - booking 22636750 (0DH6MM), producer-side. Every money-bearing message carried an updated_at
-#   44ms OLDER than the zero-money payload the projection had already accepted.
-# Case B - booking 22636772 (0DH6N8), consumer-side. Two messages carrying the money at a timestamp the
-#   guard accepts were discarded by dedup, which keeps the highest [serialized_at, offset].
-module Exp6591
+# Case A - producer-side. Every money-bearing message carried an updated_at 44ms OLDER than the
+#   zero-money payload the projection had already accepted.
+# Case B - consumer-side. Two messages carrying the money at a timestamp the guard accepts were
+#   discarded by dedup, which keeps the highest [serialized_at, offset].
+module EmbeddedChildrenPersistenceTest
   module DB
     class << self
       def bookings
@@ -107,7 +107,7 @@ module Exp6591
   end
 end
 
-RSpec.describe "EXP-6591: money the consumer discarded" do # rubocop:disable RSpec/DescribeClass
+RSpec.describe "Money the consumer discarded along with the parent payload" do # rubocop:disable RSpec/DescribeClass
   subject(:consume) { consumer.consume }
 
   let(:topic) do
@@ -118,7 +118,7 @@ RSpec.describe "EXP-6591: money the consumer discarded" do # rubocop:disable RSp
   let(:deduplication_disabled) { { params_batch_transformation: nil } }
   let(:config) do
     Dionysus::Consumer::Config.new.tap do |current_config|
-      current_config.model_factory = Exp6591::ModelFactory.new
+      current_config.model_factory = EmbeddedChildrenPersistenceTest::ModelFactory.new
       current_config.transaction_provider = transaction_provider
       current_config.processing_mutex_provider = processing_mutex_provider
       current_config.processing_mutex_method_name = :lock_with
@@ -156,7 +156,7 @@ RSpec.describe "EXP-6591: money the consumer discarded" do # rubocop:disable RSp
   end
 
   before do
-    Exp6591::DB.reset!
+    EmbeddedChildrenPersistenceTest::DB.reset!
     allow(consumer).to receive(:messages).and_return(batch)
   end
 
@@ -203,15 +203,15 @@ RSpec.describe "EXP-6591: money the consumer discarded" do # rubocop:disable RSp
   end
 
   def stored_booking(booking_id)
-    Exp6591::DB.bookings.find { |booking| booking.synced_id == booking_id }
+    EmbeddedChildrenPersistenceTest::DB.bookings.find { |booking| booking.synced_id == booking_id }
   end
 
   # traversing children under a rejected parent is also the only new exposure: the purge stamps
   # synced_canceled_at without bumping synced_updated_at, so a tie is how a cancelled child comes back
   describe "Children reached through a parent the guard rejected" do
-    let(:booking_id) { 22_636_800 }
-    let(:payment_id) { 15_394_500 }
-    let(:client_id) { 991_100 }
+    let(:booking_id) { 4 }
+    let(:payment_id) { 41 }
+    let(:client_id) { 51 }
     let(:projection_synced_at) { Time.parse("2026-08-31T13:20:00.000000Z") }
     let(:stale_updated_at) { "2026-08-31T13:19:59.000000Z" }
     let(:child_synced_at) { "2026-08-31T13:19:50.000000Z" }
@@ -230,17 +230,17 @@ RSpec.describe "EXP-6591: money the consumer discarded" do # rubocop:disable RSp
                 client: { "id" => client_id, "fullname" => "Rich Piana", "links" => {} }
               }
             ),
-            55_200_001, booking_id
+            1, booking_id
           )
         ]
       )
     end
 
     before do
-      Exp6591::DB.bookings << Exp6591::Booking.new(
+      EmbeddedChildrenPersistenceTest::DB.bookings << EmbeddedChildrenPersistenceTest::Booking.new(
         synced_id: booking_id, synced_updated_at: projection_synced_at, paid_amount: "0.0"
       )
-      Exp6591::DB.payments << Exp6591::BookingsPayment.new(
+      EmbeddedChildrenPersistenceTest::DB.payments << EmbeddedChildrenPersistenceTest::BookingsPayment.new(
         synced_id: payment_id, synced_booking_id: booking_id, synced_updated_at: child_synced_at,
         synced_canceled_at: purged_at, amount: "500.0"
       )
@@ -249,7 +249,7 @@ RSpec.describe "EXP-6591: money the consumer discarded" do # rubocop:disable RSp
     it "does not revive a child the purge cancelled, when the payload only ties on its timestamp" do
       consume
 
-      expect(Exp6591::DB.payments.map(&:synced_canceled_at)).to eq([purged_at])
+      expect(EmbeddedChildrenPersistenceTest::DB.payments.map(&:synced_canceled_at)).to eq([purged_at])
     end
 
     it "does not resolve the to_one association off a payload it rejected" do
@@ -264,7 +264,7 @@ RSpec.describe "EXP-6591: money the consumer discarded" do # rubocop:disable RSp
       it "persists it, so the strict comparison does not block a genuine repair" do
         consume
 
-        expect(Exp6591::DB.payments.map(&:synced_canceled_at)).to eq([nil])
+        expect(EmbeddedChildrenPersistenceTest::DB.payments.map(&:synced_canceled_at)).to eq([nil])
       end
     end
   end
@@ -272,8 +272,8 @@ RSpec.describe "EXP-6591: money the consumer discarded" do # rubocop:disable RSp
   # a reproduction that fails because the fixture is wrong looks exactly like one that fails because the
   # code is wrong, so establish first that this harness persists a payload the guard accepts
   describe "Control - the same shape at a timestamp the guard accepts" do
-    let(:booking_id) { 22_636_772 }
-    let(:payment_id) { 15_394_239 }
+    let(:booking_id) { 2 }
+    let(:payment_id) { 21 }
     let(:projection_synced_at) { Time.parse("2026-08-31T13:12:56.614193Z") }
     let(:batch) do
       build_batch(
@@ -285,14 +285,14 @@ RSpec.describe "EXP-6591: money the consumer discarded" do # rubocop:disable RSp
               embedded: { payments: [payment_payload(payment_id:, booking_id:, amount: "127.0",
                 created_at: "2026-08-31T13:12:57.100000Z", updated_at: "2026-08-31T13:12:57.100000Z")] }
             ),
-            55_101_943, booking_id
+            1, booking_id
           )
         ]
       )
     end
 
     before do
-      Exp6591::DB.bookings << Exp6591::Booking.new(
+      EmbeddedChildrenPersistenceTest::DB.bookings << EmbeddedChildrenPersistenceTest::Booking.new(
         synced_id: booking_id, synced_updated_at: projection_synced_at, paid_amount: "0.0"
       )
     end
@@ -306,7 +306,7 @@ RSpec.describe "EXP-6591: money the consumer discarded" do # rubocop:disable RSp
     it "creates the embedded payment, so the has_many really is being traversed" do
       consume
 
-      expect(Exp6591::DB.payments.map { |payment| [payment.synced_id, payment.amount] })
+      expect(EmbeddedChildrenPersistenceTest::DB.payments.map { |payment| [payment.synced_id, payment.amount] })
         .to eq([[payment_id, "127.0"]])
     end
 
@@ -317,9 +317,9 @@ RSpec.describe "EXP-6591: money the consumer discarded" do # rubocop:disable RSp
     end
   end
 
-  describe "Case A - 22636750, every money-bearing message carried a torn updated_at" do
-    let(:booking_id) { 22_636_750 }
-    let(:payment_id) { 15_394_101 }
+  describe "Case A - every money-bearing message carried a torn updated_at" do
+    let(:booking_id) { 1 }
+    let(:payment_id) { 11 }
     # the zero-money payload the projection accepted, at 13:06:36.581930
     let(:projection_synced_at) { Time.parse("2026-08-31T13:06:36.581930Z") }
     # the money messages report 13:06:36.537851 - 44ms BEFORE what the projection already holds
@@ -329,8 +329,8 @@ RSpec.describe "EXP-6591: money the consumer discarded" do # rubocop:disable RSp
     let(:batch) do
       build_batch(
         [
-          build_message(money_payload("2026-08-31T13:06:37.247000Z"), 55_101_152, booking_id),
-          build_message(money_payload("2026-08-31T13:06:37.178000Z"), 55_101_153, booking_id)
+          build_message(money_payload("2026-08-31T13:06:37.247000Z"), 1, booking_id),
+          build_message(money_payload("2026-08-31T13:06:37.178000Z"), 2, booking_id)
         ]
       )
     end
@@ -344,7 +344,7 @@ RSpec.describe "EXP-6591: money the consumer discarded" do # rubocop:disable RSp
     end
 
     before do
-      Exp6591::DB.bookings << Exp6591::Booking.new(
+      EmbeddedChildrenPersistenceTest::DB.bookings << EmbeddedChildrenPersistenceTest::Booking.new(
         synced_id: booking_id, synced_updated_at: projection_synced_at, paid_amount: "0.0"
       )
     end
@@ -352,7 +352,7 @@ RSpec.describe "EXP-6591: money the consumer discarded" do # rubocop:disable RSp
     it "persists the payment the booking payload carries" do
       consume
 
-      expect(Exp6591::DB.payments.map(&:synced_id)).to eq([payment_id])
+      expect(EmbeddedChildrenPersistenceTest::DB.payments.map(&:synced_id)).to eq([payment_id])
     end
 
     it "leaves paid_amount stale, because no consumer-side rule can prefer an older timestamp" do
@@ -375,14 +375,14 @@ RSpec.describe "EXP-6591: money the consumer discarded" do # rubocop:disable RSp
       it "persists the payment either way" do
         consume
 
-        expect(Exp6591::DB.payments.map(&:synced_id)).to eq([payment_id])
+        expect(EmbeddedChildrenPersistenceTest::DB.payments.map(&:synced_id)).to eq([payment_id])
       end
     end
   end
 
-  describe "Case B - 22636772, dedup discarded two messages the guard would have accepted" do
-    let(:booking_id) { 22_636_772 }
-    let(:payment_id) { 15_394_239 }
+  describe "Case B - dedup discarded two messages the guard would have accepted" do
+    let(:booking_id) { 2 }
+    let(:payment_id) { 21 }
     # the zero-money payload the projection accepted, at 13:12:56.614193
     let(:projection_synced_at) { Time.parse("2026-08-31T13:12:56.614193Z") }
     let(:acceptable_updated_at) { "2026-08-31T13:12:56.975713Z" }
@@ -391,9 +391,9 @@ RSpec.describe "EXP-6591: money the consumer discarded" do # rubocop:disable RSp
     let(:batch) do
       build_batch(
         [
-          build_message(money_payload(acceptable_updated_at, "2026-08-31T13:12:57.097939Z"), 55_101_943, booking_id),
-          build_message(money_payload(acceptable_updated_at, "2026-08-31T13:12:57.340585Z"), 55_101_944, booking_id),
-          build_message(money_payload(torn_updated_at, "2026-08-31T13:12:57.593432Z"), 55_101_945, booking_id)
+          build_message(money_payload(acceptable_updated_at, "2026-08-31T13:12:57.097939Z"), 1, booking_id),
+          build_message(money_payload(acceptable_updated_at, "2026-08-31T13:12:57.340585Z"), 2, booking_id),
+          build_message(money_payload(torn_updated_at, "2026-08-31T13:12:57.593432Z"), 3, booking_id)
         ]
       )
     end
@@ -407,13 +407,14 @@ RSpec.describe "EXP-6591: money the consumer discarded" do # rubocop:disable RSp
     end
 
     before do
-      Exp6591::DB.bookings << Exp6591::Booking.new(
+      EmbeddedChildrenPersistenceTest::DB.bookings << EmbeddedChildrenPersistenceTest::Booking.new(
         synced_id: booking_id, synced_updated_at: projection_synced_at, paid_amount: "0.0"
       )
     end
 
     it "persists the money, because two messages in the group carry a timestamp the guard accepts" do
-      pending "needs guard-driven candidate fallback; ranking on updated_at is disproven by fixture 22578292"
+      pending "needs guard-driven candidate fallback; ranking on updated_at is disproven by the " \
+              "torn-payload fixture in the deduplication specs"
       consume
 
       expect(stored_booking(booking_id).paid_amount).to eq("127.0")
@@ -422,7 +423,7 @@ RSpec.describe "EXP-6591: money the consumer discarded" do # rubocop:disable RSp
     it "persists the payment the booking payload carries" do
       consume
 
-      expect(Exp6591::DB.payments.map(&:synced_id)).to eq([payment_id])
+      expect(EmbeddedChildrenPersistenceTest::DB.payments.map(&:synced_id)).to eq([payment_id])
     end
 
     context "when the consuming app turns deduplication off for the topic" do
@@ -440,9 +441,9 @@ RSpec.describe "EXP-6591: money the consumer discarded" do # rubocop:disable RSp
       let(:batch) do
         build_batch(
           [
-            build_message(money_payload(acceptable_updated_at, "2026-08-31T13:12:57.097939Z"), 55_101_943,
+            build_message(money_payload(acceptable_updated_at, "2026-08-31T13:12:57.097939Z"), 1,
               booking_id),
-            build_message(money_payload(acceptable_updated_at, "2026-08-31T13:12:57.340585Z"), 55_101_944,
+            build_message(money_payload(acceptable_updated_at, "2026-08-31T13:12:57.340585Z"), 2,
               booking_id)
           ]
         )
