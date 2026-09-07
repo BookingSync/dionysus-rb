@@ -1506,5 +1506,57 @@ RSpec.describe Dionysus::Producer::KarafkaResponderGenerator do
         end
       end
     end
+
+    describe "repairing a record whose embedded records are newer" do
+      subject(:call) { responder.call([event], partition_key: "Smily", key: "#WhateverItTakes") }
+
+      let(:responder) { generate.new }
+      let(:genesis_replica) { false }
+      let(:event) { ["rental_created", [rental_1]] }
+      let(:earlier_stamp) { Time.utc(2026, 9, 7, 1, 46, 34) }
+      let(:later_stamp) { Time.utc(2026, 9, 7, 1, 46, 35) }
+      let(:rental_1) do
+        id = ExampleResource.insert_all(
+          [{ account_id: 1, created_at: earlier_stamp, updated_at: earlier_stamp }]
+        ).first.fetch("id")
+        ExampleResource.find(id)
+      end
+      let(:serializer) do
+        child = later_stamp
+        Class.new do
+          define_singleton_method(:serialize) do |records, dependencies:|
+            _ = dependencies
+            records.map do |record|
+              { "id" => record.id, "updated_at" => record.updated_at,
+                "payments" => [{ "updated_at" => child }] }
+            end
+          end
+        end
+      end
+      let(:published_updated_at) do
+        JSON.parse(responder.messages_buffer.fetch("v8_rentals").first.first)
+          .fetch("message").first.fetch("data").first.fetch("updated_at")
+      end
+
+      context "when the repair is disabled" do
+        it "publishes the stale timestamp and leaves the row alone" do
+          call
+
+          expect(Time.parse(published_updated_at)).to eq earlier_stamp
+          expect(ExampleResource.find(rental_1.id).updated_at).to eq earlier_stamp
+        end
+      end
+
+      context "when the repair is enabled" do
+        before { config.touch_records_behind_their_embedded_records = true }
+
+        it "corrects the row and publishes the corrected timestamp" do
+          call
+
+          expect(Time.parse(published_updated_at)).to eq later_stamp
+          expect(ExampleResource.find(rental_1.id).updated_at).to eq later_stamp
+        end
+      end
+    end
   end
 end
