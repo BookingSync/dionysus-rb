@@ -479,4 +479,26 @@ RSpec.describe Dionysus::Producer::Config do
       it { is_expected.to be true }
     end
   end
+
+  describe "#stamp_payload_with_embedded_timestamps/stamp_payload_with_embedded_timestamps=" do
+    subject(:stamp_payload_with_embedded_timestamps) { config.stamp_payload_with_embedded_timestamps }
+
+    let(:config) { described_class.new }
+
+    context "when stamp_payload_with_embedded_timestamps is not specified" do
+      it { is_expected.to be false }
+    end
+
+    context "when stamp_payload_with_embedded_timestamps is disabled" do
+      before { config.stamp_payload_with_embedded_timestamps = false }
+
+      it { is_expected.to be false }
+    end
+
+    context "when stamp_payload_with_embedded_timestamps is enabled" do
+      before { config.stamp_payload_with_embedded_timestamps = true }
+
+      it { is_expected.to be true }
+    end
+  end
 end

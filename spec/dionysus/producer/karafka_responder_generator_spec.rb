@@ -1506,5 +1506,49 @@ RSpec.describe Dionysus::Producer::KarafkaResponderGenerator do
         end
       end
     end
+
+    describe "stamping the payload with its embedded timestamps" do
+      subject(:call) { responder.call([event], partition_key: "Smily", key: "#WhateverItTakes") }
+
+      let(:responder) { generate.new }
+      let(:genesis_replica) { false }
+      let(:event) { ["rental_created", [rental_1]] }
+      let(:earlier_stamp) { Time.utc(2026, 9, 7, 1, 46, 34) }
+      let(:later_stamp) { Time.utc(2026, 9, 7, 1, 46, 35) }
+      let(:serializer) do
+        parent = earlier_stamp
+        child = later_stamp
+        Class.new do
+          define_singleton_method(:serialize) do |records, dependencies:|
+            _ = dependencies
+            records.map do |record|
+              { "id" => record.id, "updated_at" => parent, "payments" => [{ "updated_at" => child }] }
+            end
+          end
+        end
+      end
+      let(:published_updated_at) do
+        JSON.parse(responder.messages_buffer.fetch("v8_rentals").first.first)
+          .fetch("message").first.fetch("data").first.fetch("updated_at")
+      end
+
+      context "when the stamp is disabled" do
+        it "publishes the parent's own timestamp" do
+          call
+
+          expect(Time.parse(published_updated_at)).to eq earlier_stamp
+        end
+      end
+
+      context "when the stamp is enabled" do
+        before { config.stamp_payload_with_embedded_timestamps = true }
+
+        it "publishes the age of the payload" do
+          call
+
+          expect(Time.parse(published_updated_at)).to eq later_stamp
+        end
+      end
+    end
   end
 end
