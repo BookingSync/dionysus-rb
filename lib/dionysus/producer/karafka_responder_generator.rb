@@ -49,6 +49,7 @@ class Dionysus::Producer::KarafkaResponderGenerator
               # consumers rank duplicates by this stamp, so it has to describe the attempt actually
               # published - with retries that is the last one, not the first
               payload, read_at = serialize_consistently(records, topic, batch_options)
+              payload = Dionysus::Producer::PayloadTimestamp.apply(payload, config)
               serialized_at = config.include_serialized_at_in_payload ? read_at : nil
 
               event_payload = {

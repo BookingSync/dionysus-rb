@@ -10,7 +10,8 @@ class Dionysus::Producer::Config
     :genesis_consistency_safety_delay, :hermes_event_producer, :publish_after_commit, :outbox_worker_publishing_delay,
     :high_priority_sidekiq_queue, :observers_inline_maximum_size, :remove_consecutive_duplicates_before_publishing,
     :include_serialized_at_in_payload, :publish_with_uncached_reads, :publish_consistent_snapshots,
-    :max_snapshot_attempts, :republish_deduplicated_records, :republish_deduplicated_records_delay
+    :max_snapshot_attempts, :republish_deduplicated_records, :republish_deduplicated_records_delay,
+    :stamp_payload_with_embedded_timestamps
 
   def self.default_sidekiq_queue
     :dionysus
@@ -96,6 +97,14 @@ class Dionysus::Producer::Config
 
   def observers_inline_maximum_size
     @observers_inline_maximum_size || 1000
+  end
+
+  # Raises the payload timestamp to the newest timestamp embedded in it. Off by default: it
+  # changes what updated_at means on the wire, so consumers that mirror it come first.
+  def stamp_payload_with_embedded_timestamps
+    return @stamp_payload_with_embedded_timestamps if defined?(@stamp_payload_with_embedded_timestamps)
+
+    false
   end
 
   # Off by default so it can be switched on per producer, and switched back off in one env change
