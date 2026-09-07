@@ -480,23 +480,23 @@ RSpec.describe Dionysus::Producer::Config do
     end
   end
 
-  describe "#stamp_payload_with_embedded_timestamps/stamp_payload_with_embedded_timestamps=" do
-    subject(:stamp_payload_with_embedded_timestamps) { config.stamp_payload_with_embedded_timestamps }
+  describe "#touch_records_behind_their_embedded_records/touch_records_behind_their_embedded_records=" do
+    subject(:touch_records_behind_their_embedded_records) { config.touch_records_behind_their_embedded_records }
 
     let(:config) { described_class.new }
 
-    context "when stamp_payload_with_embedded_timestamps is not specified" do
+    context "when touch_records_behind_their_embedded_records is not specified" do
       it { is_expected.to be false }
     end
 
-    context "when stamp_payload_with_embedded_timestamps is disabled" do
-      before { config.stamp_payload_with_embedded_timestamps = false }
+    context "when touch_records_behind_their_embedded_records is disabled" do
+      before { config.touch_records_behind_their_embedded_records = false }
 
       it { is_expected.to be false }
     end
 
-    context "when stamp_payload_with_embedded_timestamps is enabled" do
-      before { config.stamp_payload_with_embedded_timestamps = true }
+    context "when touch_records_behind_their_embedded_records is enabled" do
+      before { config.touch_records_behind_their_embedded_records = true }
 
       it { is_expected.to be true }
     end

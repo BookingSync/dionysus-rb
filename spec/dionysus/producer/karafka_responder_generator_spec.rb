@@ -1507,7 +1507,7 @@ RSpec.describe Dionysus::Producer::KarafkaResponderGenerator do
       end
     end
 
-    describe "stamping the payload with its embedded timestamps" do
+    describe "repairing a record whose embedded records are newer" do
       subject(:call) { responder.call([event], partition_key: "Smily", key: "#WhateverItTakes") }
 
       let(:responder) { generate.new }
@@ -1515,14 +1515,20 @@ RSpec.describe Dionysus::Producer::KarafkaResponderGenerator do
       let(:event) { ["rental_created", [rental_1]] }
       let(:earlier_stamp) { Time.utc(2026, 9, 7, 1, 46, 34) }
       let(:later_stamp) { Time.utc(2026, 9, 7, 1, 46, 35) }
+      let(:rental_1) do
+        id = ExampleResource.insert_all(
+          [{ account_id: 1, created_at: earlier_stamp, updated_at: earlier_stamp }]
+        ).first.fetch("id")
+        ExampleResource.find(id)
+      end
       let(:serializer) do
-        parent = earlier_stamp
         child = later_stamp
         Class.new do
           define_singleton_method(:serialize) do |records, dependencies:|
             _ = dependencies
             records.map do |record|
-              { "id" => record.id, "updated_at" => parent, "payments" => [{ "updated_at" => child }] }
+              { "id" => record.id, "updated_at" => record.updated_at,
+                "payments" => [{ "updated_at" => child }] }
             end
           end
         end
@@ -1532,21 +1538,23 @@ RSpec.describe Dionysus::Producer::KarafkaResponderGenerator do
           .fetch("message").first.fetch("data").first.fetch("updated_at")
       end
 
-      context "when the stamp is disabled" do
-        it "publishes the parent's own timestamp" do
+      context "when the repair is disabled" do
+        it "publishes the stale timestamp and leaves the row alone" do
           call
 
           expect(Time.parse(published_updated_at)).to eq earlier_stamp
+          expect(ExampleResource.find(rental_1.id).updated_at).to eq earlier_stamp
         end
       end
 
-      context "when the stamp is enabled" do
-        before { config.stamp_payload_with_embedded_timestamps = true }
+      context "when the repair is enabled" do
+        before { config.touch_records_behind_their_embedded_records = true }
 
-        it "publishes the age of the payload" do
+        it "corrects the row and publishes the corrected timestamp" do
           call
 
           expect(Time.parse(published_updated_at)).to eq later_stamp
+          expect(ExampleResource.find(rental_1.id).updated_at).to eq later_stamp
         end
       end
     end

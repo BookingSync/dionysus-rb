@@ -11,7 +11,7 @@ class Dionysus::Producer::Config
     :high_priority_sidekiq_queue, :observers_inline_maximum_size, :remove_consecutive_duplicates_before_publishing,
     :include_serialized_at_in_payload, :publish_with_uncached_reads, :publish_consistent_snapshots,
     :max_snapshot_attempts, :republish_deduplicated_records, :republish_deduplicated_records_delay,
-    :stamp_payload_with_embedded_timestamps
+    :touch_records_behind_their_embedded_records
 
   def self.default_sidekiq_queue
     :dionysus
@@ -99,10 +99,10 @@ class Dionysus::Producer::Config
     @observers_inline_maximum_size || 1000
   end
 
-  # Raises the payload timestamp to the newest timestamp embedded in it. Off by default: it
-  # changes what updated_at means on the wire, so consumers that mirror it come first.
-  def stamp_payload_with_embedded_timestamps
-    return @stamp_payload_with_embedded_timestamps if defined?(@stamp_payload_with_embedded_timestamps)
+  # Corrects a row whose own timestamp predates a record embedded in its payload, then serializes
+  # again. Off by default: it writes to the source table from the publish path.
+  def touch_records_behind_their_embedded_records
+    return @touch_records_behind_their_embedded_records if defined?(@touch_records_behind_their_embedded_records)
 
     false
   end
