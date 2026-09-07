@@ -2,7 +2,6 @@
 
 ## [1.7.0]
 - Correct a row whose own `updated_at` predates a record embedded in its payload, then serialize again, behind `config.touch_records_behind_their_embedded_records` (default `false`). A serializer reads the parent's columns before the associations, so a child committed in between arrives under a timestamp older than itself, and the consumer discards the payload together with that child.
-- The write is `UPDATE ... WHERE updated_at < :newest`, so a stale read can never move the row backwards, and the published timestamp stays equal to the row's own - which is what the republish path relies on.
 
 ## [1.6.0]
 - Judge a payload's embedded children on their own timestamps instead of dropping them with the parent. When `persist_with_dionysus?` rejects a record, `persist` used to `next` past the whole loop body - the child `persist` calls included - so every `has_many` and `has_one` record embedded in that payload was discarded with it, with no error and no counter. The parent is still not written; only the traversal of its children is decoupled from its verdict. Each child re-enters `persist` and is guarded on its own `synced_updated_at || synced_created_at`, so a child the consumer has never seen is created and a child older than the row held locally is still skipped.
