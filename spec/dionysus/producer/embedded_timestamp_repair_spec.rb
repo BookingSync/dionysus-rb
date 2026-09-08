@@ -107,6 +107,40 @@ RSpec.describe Dionysus::Producer::EmbeddedTimestampRepair do
       end
     end
 
+    context "when a timestamp string carries no UTC offset" do
+      let(:serialize) do
+        counted = serializations
+        lambda do
+          counted << :serialized
+          [[{ "id" => record.id, "updated_at" => record.updated_at,
+              "payments" => [{ "updated_at" => "2026-09-09T01:46:35" }] }], read_at]
+        end
+      end
+
+      it "refuses it rather than resolving it in whichever zone the host happens to run" do
+        expect(published_updated_at).to eq earlier_stamp
+        expect(ExampleResource.find(record.id).updated_at).to eq earlier_stamp
+        expect(serializations.size).to eq 1
+      end
+    end
+
+    context "when a timestamp string carries a date that does not exist" do
+      let(:serialize) do
+        counted = serializations
+        lambda do
+          counted << :serialized
+          [[{ "id" => record.id, "updated_at" => record.updated_at,
+              "payments" => [{ "updated_at" => "2026-09-31T01:46:35Z" }] }], read_at]
+        end
+      end
+
+      it "refuses it rather than accepting the October date it normalizes to" do
+        expect(published_updated_at).to eq earlier_stamp
+        expect(ExampleResource.find(record.id).updated_at).to eq earlier_stamp
+        expect(serializations.size).to eq 1
+      end
+    end
+
     context "when an embedded child's timestamp is not a time" do
       let(:serialize) do
         lambda {

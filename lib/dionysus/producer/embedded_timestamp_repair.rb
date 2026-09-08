@@ -3,6 +3,7 @@
 class Dionysus::Producer::EmbeddedTimestampRepair
   TIMESTAMP_ATTRIBUTE = "updated_at"
   PRIMARY_KEY_ATTRIBUTE = "id"
+  ISO8601_WITH_OFFSET = %r{\A\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d+)?(Z|[+-]\d{2}:?\d{2})\z}
 
   # Takes the block that serializes, so a repaired record can be serialized again in one place.
   def self.call(records, config, &)
@@ -89,7 +90,13 @@ class Dionysus::Producer::EmbeddedTimestampRepair
   end
 
   def parse_iso8601(value)
-    Time.iso8601(value).in_time_zone
+    return nil unless ISO8601_WITH_OFFSET.match?(value)
+
+    time = Time.iso8601(value)
+    # Time.iso8601 normalizes an impossible date: 2026-09-31 becomes October 1.
+    return nil unless value.start_with?(time.strftime("%Y-%m-%d"))
+
+    time.in_time_zone
   rescue ArgumentError
     nil
   end
