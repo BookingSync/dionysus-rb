@@ -88,6 +88,26 @@ RSpec.describe Dionysus::Producer::EmbeddedTimestampRepair do
       end
     end
 
+    context "when the payload is keyed by symbols, as an Api::V3 serializer renders it" do
+      let(:serialize) do
+        child = later_stamp
+        counted = serializations
+        lambda do
+          counted << :serialized
+          payload = records.map do |r|
+            { "links" => {}, id: r.id, updated_at: r.updated_at.iso8601(6), payments: [{ updated_at: child }] }
+          end
+          [payload, read_at]
+        end
+      end
+
+      it "reads the symbol keys, corrects the row and serializes again" do
+        expect(call.first.first[:updated_at]).to eq later_stamp.iso8601(6)
+        expect(ExampleResource.find(record.id).updated_at).to eq later_stamp
+        expect(serializations.size).to eq 2
+      end
+    end
+
     context "when the parent's timestamp is a string that is not a full ISO8601 time" do
       let(:serialize) do
         child = later_stamp

@@ -44,7 +44,7 @@ class Dionysus::Producer::EmbeddedTimestampRepair
   def repaired?(record, record_payload)
     return false unless repairable?(record, record_payload)
 
-    published_at = coerce_time(record_payload[TIMESTAMP_ATTRIBUTE])
+    published_at = coerce_time(attribute(record_payload, TIMESTAMP_ATTRIBUTE))
     latest = embedded_timestamps(record_payload).max
     return false unless published_at && latest && latest > published_at
 
@@ -63,7 +63,7 @@ class Dionysus::Producer::EmbeddedTimestampRepair
 
   def repairable?(record, record_payload)
     record.is_a?(ActiveRecord::Base) && record.persisted? &&
-      record_payload.is_a?(Hash) && record_payload[PRIMARY_KEY_ATTRIBUTE] == record.id
+      record_payload.is_a?(Hash) && attribute(record_payload, PRIMARY_KEY_ATTRIBUTE) == record.id
   end
 
   def embedded_timestamps(record_payload)
@@ -71,7 +71,7 @@ class Dionysus::Producer::EmbeddedTimestampRepair
       Array.wrap(value).filter_map do |embedded|
         next unless embedded.is_a?(Hash)
 
-        coerce_time(embedded[TIMESTAMP_ATTRIBUTE])
+        coerce_time(attribute(embedded, TIMESTAMP_ATTRIBUTE))
       end
     end
   end
@@ -81,7 +81,11 @@ class Dionysus::Producer::EmbeddedTimestampRepair
       tags: ["model:#{record.class}", "outcome:#{updated.zero? ? "stale_read" : "row_behind"}"])
   end
 
-  # A serializer may render the timestamp it is about to publish, so one payload carries both shapes.
+  # A serializer may key its payload either way, and may render the timestamp it is about to publish.
+  def attribute(record_payload, name)
+    record_payload.key?(name) ? record_payload[name] : record_payload[name.to_sym]
+  end
+
   def coerce_time(value)
     case value
     when ActiveSupport::TimeWithZone, Time then value
