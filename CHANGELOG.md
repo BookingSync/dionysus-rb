@@ -1,5 +1,8 @@
 ## [Unreleased]
 
+## [1.7.1]
+- Parse an ISO8601 string timestamp in the payload instead of ignoring it. 1.7.0 required every timestamp to answer `acts_like_time?`, so a serializer that renders the parent's `updated_at` as a string made the whole class a silent no-op: the parent never looked time-like, no payload was ever examined, no row was ever corrected and `dionysus.publish.timestamp_repair` never fired.
+
 ## [1.7.0]
 - Correct a row whose own `updated_at` predates a record embedded in its payload, then serialize again, behind `config.touch_records_behind_their_embedded_records` (default `false`). A serializer reads the parent's columns before the associations, so a child committed in between arrives under a timestamp older than itself, and the consumer discards the payload together with that child.
 
