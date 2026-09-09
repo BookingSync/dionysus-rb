@@ -1,5 +1,9 @@
 ## [Unreleased]
 
+## [1.7.2]
+- Read the payload by either key form. 1.7.1 looked up `id` and `updated_at` as string keys, but a serializer may key its payload with symbols, so `repairable?` was false on every publish and the class stayed a silent no-op.
+
+
 ## [1.7.1]
 - Parse an ISO8601 string timestamp in the payload instead of ignoring it. 1.7.0 required every timestamp to answer `acts_like_time?`, so a serializer that renders the parent's `updated_at` as a string made the whole class a silent no-op: the parent never looked time-like, no payload was ever examined, no row was ever corrected and `dionysus.publish.timestamp_repair` never fired.
 
